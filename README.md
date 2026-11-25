@@ -14,6 +14,8 @@
     <img src="https://img.shields.io/badge/Convex-000?style=for-the-badge&logo=convex&logoColor=white" alt="Convex" />
     <img src="https://img.shields.io/badge/Vitest-6E9F18?style=for-the-badge&logo=vitest&logoColor=white" alt="Vitest" />
   </p>
+
+  <img src="./public/thumbnail2.png" alt="SkyTrip AI Travel Planner Overview" width="100%" />
 </div>
 
 ---
@@ -44,20 +46,29 @@ Modern travelers waste hours juggling fragmented browser tabs—switching betwee
 
 ## 🛠️ Technology Stack
 
-* **Framework**: Next.js 15 (App Router, API Routes, Turbopack/Webpack)
+* **Framework**: Next.js 15 (App Router, API Routes)
 * **Language**: TypeScript (`strict: true`, zero build/lint bypasses)
 * **AI Engine**: Groq API + Google Gemini API fallback with resilient JSON parsing
 * **Database**: Convex Serverless Database (`UserTable`, `TripDetailTable`)
 * **Authentication**: Clerk Auth (`@clerk/nextjs`)
 * **Maps & Places**: `@react-google-maps/api` + Google Places API (New)
-* **Security**: Arcjet rate limiting & HTTP security headers
-* **Testing**: Vitest + React Testing Library + jsdom
+* **Security**: Arcjet token-bucket rate limiting & HTTP security headers
+* **Testing & CI**: Vitest, React Testing Library, jsdom, and GitHub Actions (`.github/workflows/ci.yml`)
+
+---
+
+## 🛡️ Accessibility, Security & Testing
+
+- **Accessibility (WCAG 2.1 AA)**: Skip-to-main-content navigation link, semantic `<main>` and `<nav>` landmarks, `:focus-visible` focus rings, `prefers-reduced-motion` support, `role="dialog"` / `aria-modal="true"` modals with Escape handling, `role="tablist"` tabs, `aria-pressed` controls, and explicit `<label htmlFor>` bindings.
+- **Security**: Clerk route protection on all private planner/dashboard routes, Arcjet token-bucket rate limiting on AI & contact APIs, server-side input sanitization (`validateContactSubmission`, `sanitizeMessages`), no committed secrets (`.env.example` template provided), and strict security headers (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`).
+- **Automated Testing**: 4 test suites (30 tests) covering domain utilities, AI response recovery, API route validation, and accessible UI interactions via `npm test`.
 
 ---
 
 ## 📂 Project Structure
 
 ```
+├── .github/workflows/ci.yml         # Automated CI: typecheck, lint, and Vitest suite
 ├── __tests__/                       # Vitest unit, API route, and component tests
 ├── app/
 │   ├── api/
@@ -74,7 +85,8 @@ Modern travelers waste hours juggling fragmented browser tabs—switching betwee
 │   ├── tools/converter/             # Standalone Travel Toolkit (Currency/Timezone/Events)
 │   ├── view-trip/[tripId]/          # Interactive trip detail, companion & PDF guide
 │   ├── about/, adventure/, contact/, hidden-gems/, inspire/
-│   ├── layout.tsx & provider.tsx    # Global providers, skip-link & <main> landmark
+│   ├── error.tsx & not-found.tsx    # Resilient error boundary & 404 fallback
+│   └── layout.tsx & provider.tsx    # Global providers, skip-link & <main> landmark
 ├── components/ui/                   # Accessible UI primitives, modals & animations
 ├── convex/                          # Convex schema, user credits & trip mutations
 ├── lib/
@@ -101,16 +113,8 @@ npm install
 
 ### 3. Configure Environment Variables
 Copy `.env.example` to `.env.local` and fill in your credentials:
-```env
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
-CLERK_SECRET_KEY=your_clerk_secret_key
-CONVEX_DEPLOYMENT=your_convex_deployment
-NEXT_PUBLIC_CONVEX_URL=your_convex_url
-NEXT_PUBLIC_GOOGLE_PLACES_API_KEY=your_google_places_api_key
-GOOGLE_PLACES_API_KEY=your_google_places_api_key
-ARCJET_KEY=your_arcjet_key
-GROQ_API_KEY=your_groq_api_key
-GEMINI_API_KEY=your_gemini_api_key
+```bash
+cp .env.example .env.local
 ```
 
 ### 4. Run Quality Checks & Tests
@@ -118,6 +122,7 @@ GEMINI_API_KEY=your_gemini_api_key
 npm run typecheck   # Strict TypeScript check (tsc --noEmit)
 npm run lint        # ESLint verification
 npm test            # Run Vitest unit, API & accessibility tests
+npm run build       # Production Next.js build verification
 ```
 
 ### 5. Launch Development Servers
