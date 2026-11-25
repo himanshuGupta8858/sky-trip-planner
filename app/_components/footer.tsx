@@ -11,28 +11,42 @@ import {
   Twitter
 } from "lucide-react";
 import { motion } from "motion/react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
+  const [newsletterEmail, setNewsletterEmail] = useState("");
+
+  const handleSubscribe = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = newsletterEmail.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
+    toast.success("Subscribed to SkyTrip travel updates!");
+    setNewsletterEmail("");
+  };
 
   const footerLinks = {
     company: [
-      { name: "About Us", href: "#" },
-      { name: "Careers", href: "#" },
-      { name: "Blog", href: "#" },
-      { name: "Press", href: "#" },
+      { name: "About Us", href: "/about" },
+      { name: "Dashboard", href: "/dashboard" },
+      { name: "Pricing", href: "/pricing" },
+      { name: "Travel Toolkit", href: "/tools/converter" },
     ],
     support: [
-      { name: "Help Center", href: "#" },
       { name: "Contact Us", href: "/contact" },
-      { name: "Privacy Policy", href: "#" },
-      { name: "Terms of Service", href: "#" },
+      { name: "Create New Trip", href: "/create-new-trip" },
+      { name: "My Saved Trips", href: "/my-trips" },
+      { name: "FAQ", href: "/contact#faq" },
     ],
     destinations: [
-      { name: "Popular Cities", href: "#" },
-      { name: "Adventure Tours", href: "#" },
-      { name: "Beach Resorts", href: "#" },
-      { name: "Mountain Trips", href: "#" },
+      { name: "Inspire Me", href: "/inspire" },
+      { name: "Adventure Tours", href: "/adventure" },
+      { name: "Hidden Gems", href: "/hidden-gems" },
+      { name: "Smart Planner", href: "/create-new-trip" },
     ],
   };
 
@@ -210,6 +224,8 @@ export default function Footer() {
                     <motion.a
                       key={social.label}
                       href={social.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       aria-label={social.label}
                       className="w-10 h-10 rounded-full bg-neutral-800/50 backdrop-blur-sm border border-neutral-700/50 flex items-center justify-center text-neutral-400 hover:text-white hover:border-blue-500/50 transition-all duration-300"
                       whileHover={{ scale: 1.1, rotate: 5 }}
@@ -227,28 +243,37 @@ export default function Footer() {
             </div>
 
             {/* Newsletter */}
-            <motion.div
+            <motion.form
+              onSubmit={handleSubscribe}
               className="flex-1 max-w-md"
               initial={{ opacity: 0, scale: 0.95 }}
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5 }}
             >
+              <label htmlFor="newsletter-email" className="sr-only">
+                Subscribe to newsletter email address
+              </label>
               <div className="flex gap-2">
                 <input
+                  id="newsletter-email"
                   type="email"
+                  value={newsletterEmail}
+                  onChange={(e) => setNewsletterEmail(e.target.value)}
                   placeholder="Enter your email"
+                  aria-label="Email address for newsletter"
                   className="flex-1 px-4 py-2 bg-neutral-800/50 backdrop-blur-sm border border-neutral-700/50 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all"
                 />
                 <motion.button
-                  className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium hover:from-blue-500 hover:to-purple-500 transition-all"
+                  type="submit"
+                  className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium hover:from-blue-500 hover:to-purple-500 transition-all cursor-pointer"
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
                   Subscribe
                 </motion.button>
               </div>
-            </motion.div>
+            </motion.form>
           </div>
         </motion.div>
 

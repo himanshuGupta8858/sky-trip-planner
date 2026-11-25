@@ -1,13 +1,12 @@
 "use client";
 import { Check, Download, Luggage, Share2, Shirt, Smartphone } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { TripInfo } from "./chatbox";
+import type { TripInfo } from "@/types/trip";
 
 const PackingList = ({ trip }: { trip: TripInfo | undefined }) => {
 
-    // Simple logic to generate "Smart" items based on destination
-    const generateList = () => {
+    const generateList = useCallback(() => {
         const dest = trip?.destination?.toLowerCase() || "";
         const desc = trip?.itinerary?.[0]?.day_plan?.toLowerCase() || ""; // Check first day for clues
 
@@ -53,7 +52,7 @@ const PackingList = ({ trip }: { trip: TripInfo | undefined }) => {
         }
 
         return { essentials, clothing, gadgets };
-    };
+    }, [trip?.destination, trip?.duration, trip?.itinerary]);
 
     const [items, setItems] = useState<{
         essentials: { name: string; checked: boolean }[];
@@ -65,7 +64,7 @@ const PackingList = ({ trip }: { trip: TripInfo | undefined }) => {
         if (trip) {
             setItems(generateList());
         }
-    }, [trip]);
+    }, [trip, generateList]);
 
     const toggleItem = (category: keyof typeof items, index: number) => {
         setItems(prev => {

@@ -1,94 +1,87 @@
-# SkyTrip - AI-Powered Trip Planner
+# SkyTrip — AI-Powered Personalized Travel Planner & Companion
 
 <div align="center">
   <img src="./public/logo.svg" alt="SkyTrip Logo" width="100" height="auto" />
-  <h2>✈️ SkyTrip - AI-Powered Travel Planner</h2>
-  <p><strong>Transforming travel planning with cutting-edge AI, interactive mapping, and real-time assistant chats.</strong></p>
+  <h2>✈️ SkyTrip — AI-Powered Travel Planner</h2>
+  <p><strong>End-to-end intelligent itinerary generation, route optimization, accessible travel planning, and offline-resilient trip companion tools.</strong></p>
 
   <p>
-    <img src="https://img.shields.io/badge/Next.js%2015-000?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js" />
+    <img src="https://img.shields.io/badge/Next.js%2015-000?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js 15" />
     <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
-    <img src="https://img.shields.io/badge/Tailwind_CSS_v4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind" />
-    <img src="https://img.shields.io/badge/Gemini_AI-4285F4?style=for-the-badge&logo=google&logoColor=white" alt="Gemini AI" />
+    <img src="https://img.shields.io/badge/Tailwind_CSS_v4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind CSS v4" />
+    <img src="https://img.shields.io/badge/Groq_%2B_Gemini_AI-4285F4?style=for-the-badge&logo=google&logoColor=white" alt="Groq and Gemini AI" />
     <img src="https://img.shields.io/badge/Clerk%20Auth-6C47FF?style=for-the-badge&logo=clerk&logoColor=white" alt="Clerk" />
     <img src="https://img.shields.io/badge/Convex-000?style=for-the-badge&logo=convex&logoColor=white" alt="Convex" />
+    <img src="https://img.shields.io/badge/Vitest-6E9F18?style=for-the-badge&logo=vitest&logoColor=white" alt="Vitest" />
   </p>
 </div>
 
 ---
 
-## ✨ Overview
+## 🎯 Problem Statement & Objectives
 
-**SkyTrip** is a next-generation AI travel planner designed to replace hours of research, chaotic browser tabs, and fragmented planning notes with a single, unified travel hub. 
+### Root Challenge
+Modern travelers waste hours juggling fragmented browser tabs—switching between hotel aggregators, map tools, currency converters, timezone calculators, festival calendars, and travel blogs—only to end up with poorly sequenced routes, unexpected costs, and plans that fail when connectivity drops.
 
-Provide your destination, budget, duration, and travel crew, and SkyTrip will dynamically construct a complete day-by-day itinerary complete with live hotel listings, location markers, ticket estimates, and an interactive route-drawn map.
+### Target User Needs
+- **Personalized & Budget-Aligned Planning**: Tailored itineraries for solo travelers, couples, families, and groups across Low, Medium, and High budget tiers.
+- **Geographically Logical Routing**: Sequential day-by-day routes (`Hotel → Activities → Hotel`) that minimize transit fatigue and back-tracking.
+- **Real-Time Multi-Utility Companion**: Integrated currency conversion, destination timezone comparisons with sociable calling-hour warnings, and local cultural event discovery.
+- **Inclusive, Accessible & Offline-Resilient Experience**: WCAG 2.1 AA keyboard/screen-reader navigation, reduced-motion support, accessibility notes in itineraries, offline fallback calculations, and QR-linked printable PDF travel guides.
+
+### Core Objectives & Solution Mapping
+| Objective | Implementation in SkyTrip |
+| :--- | :--- |
+| **Conversational Guided Planning** | Multi-turn AI intake (`app/api/aimodel/route.ts` + `chatbox.tsx`) collecting origin, destination, group size, budget, duration, interests, and accessibility needs. |
+| **Reliable Multi-Provider AI** | Fast Groq (`openai/gpt-oss-20b`) primary inference with automatic JSON extraction/recovery and Google Gemini (`gemini-2.5-flash` / `gemini-1.5-flash`) fallback (`lib/ai-helpers.ts`). |
+| **Interactive Spatial Routing** | `GlobalMap.tsx` plots hotels, numbered activities, polylines per day, and nearby essentials (`Restaurants`, `ATMs`, `Hospitals`, `Metro`, `EV Charging`) via Places API (New). |
+| **Unified Companion Toolkit** | `TripPlannerAddon.tsx` & `/tools/converter` provide live ExchangeRate currency conversion, IANA timezone offset sliders, local events, and offline fallbacks (`lib/travel-utils.ts`). |
+| **Context-Aware Assistant** | Floating `TripChatbot.tsx` backed by `/api/chat` answers budget, weather, hotel, and dining questions grounded in the user's saved trip JSON. |
+| **Analytics, Exports & Persistence** | Convex reactive persistence (`convex/schema.ts`, `convex/tripDetail.ts`), `/dashboard` analytics, and `PrintTravelGuide.tsx` with QR codes for offline use. |
+| **Security & Rate Protection** | Clerk authentication middleware (`middleware.ts`), Arcjet token-bucket rate limiting (`lib/arcjet.ts`), strict HTTP security headers (`next.config.ts`), and validated `/api/contact`. |
 
 ---
 
-## 🛠️ Technology Stack & Architecture
+## 🛠️ Technology Stack
 
-SkyTrip is architected using a modern, robust, and highly performant full-stack ecosystem:
-
-*   **Framework:** [Next.js 15](https://nextjs.org/) (App Router, Server Actions, API Routes)
-*   **Language:** [TypeScript](https://www.typescriptlang.org/) (Strict compilation configurations for type safety)
-*   **AI Engine:** [Google Gemini API / OpenRouter](https://ai.google.dev/) (Leverages structured schema validation for consistent JSON itinerary structure)
-*   **Real-time Database & BaaS:** [Convex](https://www.convex.dev/) (Zero-latency reactive data synchronization and edge database operations)
-*   **Authentication & Security:** [Clerk Auth](https://clerk.com/) (Secure sign-ins, sign-ups, and user sessions)
-*   **Map Integrations:** [Google Maps Platform](https://developers.google.com/maps) (`@react-google-maps/api` for custom markers, path polylines, and dynamic coordinate fitting; Google Places API for context-based hotel and activity image lookup)
-*   **Styling:** [Tailwind CSS v4](https://tailwindcss.com/) (Responsive, modern design system featuring custom utility classes)
-*   **Animations:** [Framer Motion / Motion](https://motion.dev/) (Fluid layout transitions, timelines, and dynamic page effects)
-*   **API Protection:** [Arcjet](https://arcjet.com/) (Protects API routes with token bucket rate limiting and bot detection)
-
----
-
-## 🚀 Key Features & Implementation
-
-### 1. 🧠 Structured AI Itinerary Generation
-*   Takes user inputs and sends custom prompts to Gemini to construct structured, type-safe JSON itinerary documents containing activities, hotels, details, and exact geographical coordinates.
-*   Integrates fallback systems to ensure elegant handling of API errors or format variations.
-
-### 2. 🗺️ Interactive Maps & Dynamic Day Filtering
-*   Incorporates a detailed, custom-themed **Google Map** (`GlobalMap`) directly beside the itinerary.
-*   **Dynamic Route Drawing:** Select a specific day on the trip timeline to instantly highlight that day's activities. The map dynamically updates its bounds to focus on that region and draws a polyline route (Hotel ➔ Activity 1 ➔ Activity 2 ➔ Hotel).
-*   Includes a functional **Overview** resetting action button that instantly centers the map view to display all days and hotels.
-
-### 3. 💬 Real-Time AI Travel Chatbot Assistant
-*   Features a persistent floating chatbot (`TripChatbot`) on the trip detail screen.
-*   Pre-loaded with the generated trip context so it can immediately answer specific queries (e.g., packing tips, estimated ticket pricing, hotel reviews, food recommendations, and local travel tips).
-*   Supports standard typing interactions as well as quick-click suggested questions.
-
-### 4. 🏨 Booking & Places Engine
-*   Integrates direct booking redirects to popular booking platforms, appending location-specific parameters.
-*   Fetches high-quality location photos on the fly from the Google Places API with robust placeholder fallbacks for when images are unavailable.
-
-### 5. 🎒 Checklist Tracker
-*   Auto-populates a packing list (`PackingList`) suited for the duration and theme of the trip, allowing users to check off items as they pack.
+* **Framework**: Next.js 15 (App Router, API Routes, Turbopack/Webpack)
+* **Language**: TypeScript (`strict: true`, zero build/lint bypasses)
+* **AI Engine**: Groq API + Google Gemini API fallback with resilient JSON parsing
+* **Database**: Convex Serverless Database (`UserTable`, `TripDetailTable`)
+* **Authentication**: Clerk Auth (`@clerk/nextjs`)
+* **Maps & Places**: `@react-google-maps/api` + Google Places API (New)
+* **Security**: Arcjet rate limiting & HTTP security headers
+* **Testing**: Vitest + React Testing Library + jsdom
 
 ---
 
 ## 📂 Project Structure
 
 ```
+├── __tests__/                       # Vitest unit, API route, and component tests
 ├── app/
 │   ├── api/
-│   │   └── chat/                    # API route for handling AI chatbot assistant requests
-│   ├── view-trip/
-│   │   └── [tripId]/                # Main page displaying the generated trip details
-│   ├── create-new-trip/
-│   │   ├── page.tsx                 # Form to customize and trigger AI trip creation
-│   │   └── _component/
-│   │       ├── GlobalMap.tsx        # Google Maps wrapper (markers, bounds, and polylines)
-│   │       ├── Itinerary.tsx        # Timeline-based day-by-day planner component
-│   │       ├── PackingList.tsx      # Checklist generator component
-│   │       └── TripChatbot.tsx      # Floating contextual AI chatbot
-│   ├── layout.tsx                   # Main global layout and Tailwind imports
-│   └── provider.tsx                 # Global state providers (Clerk, Convex, state hooks)
-├── components/
-│   └── ui/                          # Custom UI design tokens, buttons, and animations
-├── convex/
-│   ├── schema.ts                    # Convex relational database tables and schemas
-│   └── tripDetail.ts                # Convex query definitions for fetching trips by ID
-└── package.json                     # Root manifest and run configurations
+│   │   ├── aimodel/route.ts         # Guided trip questionnaire & itinerary generator
+│   │   ├── chat/route.ts            # Context-aware trip assistant API
+│   │   ├── contact/route.ts         # Validated & rate-limited contact inquiry API
+│   │   ├── google-place-detail/     # Places API (New) photo lookup
+│   │   ├── health/route.ts          # Service health & capability check
+│   │   └── trip-addon/route.ts      # Currency, timezone, tips & events API
+│   ├── create-new-trip/             # Conversational trip builder & map workspace
+│   ├── dashboard/                   # Travel analytics, Haversine distance & cost stats
+│   ├── my-trips/                    # Saved trip cards & history
+│   ├── pricing/                     # Subscription plans & credit upgrades
+│   ├── tools/converter/             # Standalone Travel Toolkit (Currency/Timezone/Events)
+│   ├── view-trip/[tripId]/          # Interactive trip detail, companion & PDF guide
+│   ├── about/, adventure/, contact/, hidden-gems/, inspire/
+│   ├── layout.tsx & provider.tsx    # Global providers, skip-link & <main> landmark
+├── components/ui/                   # Accessible UI primitives, modals & animations
+├── convex/                          # Convex schema, user credits & trip mutations
+├── lib/
+│   ├── ai-helpers.ts                # JSON payload recovery, UI inference & validation
+│   ├── arcjet.ts                    # Token bucket rate limiter
+│   └── travel-utils.ts              # Shared geo, currency, Haversine & cost utilities
+└── types/trip.ts                    # Shared strict TypeScript domain types
 ```
 
 ---
@@ -106,37 +99,30 @@ cd sky-trip-planner
 npm install
 ```
 
-### 3. Setup Environment Variables
-Create a `.env.local` file in the root directory:
+### 3. Configure Environment Variables
+Copy `.env.example` to `.env.local` and fill in your credentials:
 ```env
-# Clerk Credentials
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_publishable_key
-CLERK_SECRET_KEY=your_secret_key
-
-# Convex Database Credentials
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+CLERK_SECRET_KEY=your_clerk_secret_key
 CONVEX_DEPLOYMENT=your_convex_deployment
 NEXT_PUBLIC_CONVEX_URL=your_convex_url
-
-# API Access Keys
-NEXT_PUBLIC_GOOGLE_PLACES_API_KEY=your_google_maps_and_places_key
-OPENAI_API_KEY=your_gemini_or_openrouter_api_key
+NEXT_PUBLIC_GOOGLE_PLACES_API_KEY=your_google_places_api_key
+GOOGLE_PLACES_API_KEY=your_google_places_api_key
+ARCJET_KEY=your_arcjet_key
+GROQ_API_KEY=your_groq_api_key
+GEMINI_API_KEY=your_gemini_api_key
 ```
 
-### 4. Sync Database Schema & Mutations
-In a separate terminal tab, run the Convex development engine:
+### 4. Run Quality Checks & Tests
+```bash
+npm run typecheck   # Strict TypeScript check (tsc --noEmit)
+npm run lint        # ESLint verification
+npm test            # Run Vitest unit, API & accessibility tests
+```
+
+### 5. Launch Development Servers
 ```bash
 npx convex dev
-```
-
-### 5. Launch the Client Development Server
-```bash
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) and design your first adventure!
-
----
-
-## 💡 Engineering Highlights
-*   **Fully Responsive Splits:** Features an adaptive layout that renders side-by-side (60/40) on wider viewports and gracefully stacks vertically on smaller mobile viewports.
-*   **Strict Typing:** Designed with compile-time type verification, minimizing production runtime errors.
-*   **Contextual Caching:** Persists itineraries inside Convex, ensuring instant loading states for returning users without triggering repeated AI API queries.
+Open [http://localhost:3000](http://localhost:3000).

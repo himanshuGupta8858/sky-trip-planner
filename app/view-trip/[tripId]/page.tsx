@@ -7,40 +7,29 @@ import TripChatbot from '@/app/create-new-trip/_component/TripChatbot'
 import PrintTravelGuide from '@/app/create-new-trip/_component/PrintTravelGuide'
 import { useTripDetail, useUserDetail } from '@/app/provider'
 import { api } from '@/convex/_generated/api'
+import type { Id } from '@/convex/_generated/dataModel'
+import { buildGoogleFlightsUrl } from '@/lib/travel-utils'
+import type { CompanionData, TripRecord } from '@/types/trip'
 import { useConvex, useMutation } from 'convex/react'
 import { ArrowLeft, Check, CheckCircle, X, Star, Plane, ExternalLink } from 'lucide-react'
 import { toast } from 'sonner'
 import axios from 'axios'
 import { useParams } from 'next/navigation'
-import { useEffect, useState, useMemo } from 'react'
+import { useCallback, useEffect, useState, useMemo } from 'react'
 
 const ViewTrip = () => {
   const { tripId } = useParams();
-  const { userDetail, setUserDetail } = useUserDetail();
+  const { userDetail } = useUserDetail();
   const convex = useConvex();
   const completeTrip = useMutation(api.tripDetail.completeTripDetail);
   const saveCompanion = useMutation(api.tripDetail.SaveCompanionData);
 
   const { tripDetailInfo, setTripDetailInfo } = useTripDetail();
   const [activeDay, setActiveDay] = useState<number | null>(null);
-  const [addonData, setAddonData] = useState<any>(null);
+  const [addonData, setAddonData] = useState<CompanionData | null>(null);
 
   const googleFlightsUrl = useMemo(() => {
-    if (!tripDetailInfo?.origin || !tripDetailInfo?.destination) return "";
-    
-    const cleanCity = (name: string) => {
-      if (!name) return "";
-      return name.split(",")[0].trim();
-    };
-
-    const originCity = cleanCity(tripDetailInfo.origin);
-    const destCity = cleanCity(tripDetailInfo.destination);
-
-    const date = new Date();
-    date.setDate(date.getDate() + 7);
-    const dateString = date.toISOString().split("T")[0];
-    const query = `Flights to ${destCity} from ${originCity} on ${dateString}`;
-    return `https://www.google.com/travel/flights?q=${encodeURIComponent(query)}`;
+    return buildGoogleFlightsUrl(tripDetailInfo?.origin, tripDetailInfo?.destination);
   }, [tripDetailInfo?.origin, tripDetailInfo?.destination]);
 
   // Feedback Modal State
@@ -50,25 +39,19 @@ const ViewTrip = () => {
   const [usedPdfQr, setUsedPdfQr] = useState<string>('');
   const [feedbackNotes, setFeedbackNotes] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [tripDetailRecord, setTripDetailRecord] = useState<any | null>(null);
+  const [tripDetailRecord, setTripDetailRecord] = useState<TripRecord | null>(null);
   const [loadingAddon, setLoadingAddon] = useState(false);
 
-  useEffect(() => {
-    if (userDetail?._id) {
-      GetTripDetail();
-    }
-  }, [userDetail?._id]);
-
-  const fetchAddonData = async (origin: string, destination: string, currentTripId: string) => {
+  const fetchAddonData = useCallback(async (origin: string, destination: string, currentTripId: string) => {
+    if (!userDetail?._id) return;
     try {
       setLoadingAddon(true);
-      const res = await axios.post("/api/trip-addon", { origin, destination });
+      const res = await axios.post<CompanionData & { error?: string }>("/api/trip-addon", { origin, destination });
       if (res.data && !res.data.error) {
         setAddonData(res.data);
-        // Save companion data to Convex to avoid future generation calls
         await saveCompanion({
           tripId: currentTripId,
-          uid: userDetail._id,
+          uid: userDetail._id as Id<"UserTable">,
           companionData: res.data
         });
       }
@@ -77,26 +60,34 @@ const ViewTrip = () => {
     } finally {
       setLoadingAddon(false);
     }
-  };
+  }, [saveCompanion, userDetail?._id]);
 
-  const GetTripDetail = async () => {
-    const result = await convex.query(api?.tripDetail.GetTripById, {
-      tripId: tripId + "",
-      uid: userDetail._id
-    });
+  const getTripDetail = useCallback(async () => {
+    if (!userDetail?._id) return;
+    const result = (await convex.query(api?.tripDetail.GetTripById, {
+      tripId: String(tripId),
+      uid: userDetail._id as Id<"UserTable">
+    })) as TripRecord | null;
     const tripDetail = result?.tripDetail;
-    setTripDetailInfo(tripDetail);
+    if (tripDetail) {
+      setTripDetailInfo(tripDetail);
+    }
     setTripDetailRecord(result);
 
-    // If we already have stored companion details in the database, fetch them instantly
     if (result?.companionData) {
       setAddonData(result.companionData);
     } else if (tripDetail?.origin && tripDetail?.destination) {
       if (!addonData && !loadingAddon) {
-        fetchAddonData(tripDetail.origin, tripDetail.destination, result.tripId || (tripId + ""));
+        void fetchAddonData(tripDetail.origin, tripDetail.destination, result?.tripId || String(tripId));
       }
     }
-  }
+  }, [addonData, convex, fetchAddonData, loadingAddon, setTripDetailInfo, tripId, userDetail?._id]);
+
+  useEffect(() => {
+    if (userDetail?._id) {
+      void getTripDetail();
+    }
+  }, [userDetail?._id, getTripDetail]);
 
   const handleSubmitFeedback = async (isSkipped = false) => {
     if (!userDetail || !tripDetailRecord) return;
@@ -111,15 +102,15 @@ const ViewTrip = () => {
 
     try {
       await completeTrip({
-        tripId: tripId + "",
-        uid: userDetail._id,
+        tripId: String(tripId),
+        uid: userDetail._id as Id<"UserTable">,
         feedback: feedbackData
       });
-      setTripDetailRecord((prev: any) => ({
+      setTripDetailRecord((prev) => (prev ? {
         ...prev,
         completed: true,
         feedback: feedbackData
-      }));
+      } : null));
       setShowCompleteModal(false);
       toast.success("Trip marked as completed! 🎉");
     } catch (err) {
@@ -142,14 +133,15 @@ const ViewTrip = () => {
               <h1 className="px-2 text-4xl py-5">Interactive Trip Map</h1>
               
               <div className="flex items-center gap-3 mb-4">
-                <div 
+                <button
+                  type="button"
                   onClick={() => setActiveDay(null)}
                   className="flex items-center gap-2 px-4 py-2 bg-neutral-100 dark:bg-neutral-800 rounded-full border border-neutral-200 dark:border-neutral-700 w-fit cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-all duration-200"
                   title="Reset to overview"
                 >
-                  <ArrowLeft className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" />
+                  <ArrowLeft className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" aria-hidden="true" />
                   <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-300">Overview</span>
-                </div>
+                </button>
                 
                 {tripDetailRecord?.completed ? (
                   <div className="flex items-center gap-1.5 px-4 py-2 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 rounded-full border border-emerald-100 dark:border-emerald-900/30 font-bold text-xs shadow-sm">
@@ -208,29 +200,38 @@ const ViewTrip = () => {
       </div>
 
       {showCompleteModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="complete-trip-modal-title"
+        >
           <div className="max-w-md w-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-3xl p-6 md:p-8 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
             <button 
+              type="button"
+              aria-label="Close trip completion modal"
               onClick={() => setShowCompleteModal(false)}
-              className="absolute top-4 right-4 p-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors"
+              className="absolute top-4 right-4 p-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors cursor-pointer"
             >
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5" aria-hidden="true" />
             </button>
 
             <div className="space-y-6">
               <div>
-                <h3 className="text-2xl font-bold text-neutral-950 dark:text-white tracking-tight">Trip Completed! 🎉</h3>
+                <h3 id="complete-trip-modal-title" className="text-2xl font-bold text-neutral-950 dark:text-white tracking-tight">Trip Completed! 🎉</h3>
                 <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">We hope you had a wonderful journey. Take a moment to rate your experience.</p>
               </div>
 
               {/* Rating Field */}
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase text-neutral-400 tracking-wider block">How was your trip?</label>
-                <div className="flex gap-2">
+                <span className="text-xs font-bold uppercase text-neutral-400 tracking-wider block">How was your trip?</span>
+                <div className="flex gap-2" role="group" aria-label="Trip star rating">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
                       key={star}
                       type="button"
+                      aria-label={`Rate ${star} out of 5 stars`}
+                      aria-pressed={star <= rating}
                       onClick={() => setRating(star)}
                       className="p-1 cursor-pointer transition-transform hover:scale-110 active:scale-95"
                     >
@@ -290,8 +291,9 @@ const ViewTrip = () => {
 
               {/* Feedback Textarea */}
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase text-neutral-400 tracking-wider block">Comments or memories (optional)</label>
+                <label htmlFor="trip-feedback-notes" className="text-xs font-bold uppercase text-neutral-400 tracking-wider block">Comments or memories (optional)</label>
                 <textarea
+                  id="trip-feedback-notes"
                   value={feedbackNotes}
                   onChange={(e) => setFeedbackNotes(e.target.value)}
                   placeholder="Tell us about your highlights..."

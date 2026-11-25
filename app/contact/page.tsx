@@ -6,6 +6,7 @@ import {
 } from "lucide-react"
 import { motion } from "motion/react"
 import { useState } from "react"
+import { toast } from "sonner"
 
 const contactInfo = [
   {
@@ -66,9 +67,24 @@ export default function ContactPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    await new Promise((r) => setTimeout(r, 1500))
-    setLoading(false)
-    setSubmitted(true)
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      })
+      const data = (await response.json()) as { success?: boolean; error?: string }
+      if (!response.ok || !data.success) {
+        toast.error(data.error || "Please check your inputs and try again.")
+        return
+      }
+      setSubmitted(true)
+      toast.success("Message sent successfully!")
+    } catch {
+      toast.error("Unable to send message right now. Please try again.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -82,7 +98,7 @@ export default function ContactPage() {
         <div className="relative max-w-4xl mx-auto text-center">
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
             <span className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-2 rounded-full text-sm font-medium mb-8">
-              <MessageCircle className="w-4 h-4 text-blue-400" /> We'd love to hear from you
+              <MessageCircle className="w-4 h-4 text-blue-400" aria-hidden="true" /> We&apos;d love to hear from you
             </span>
             <h1 className="text-5xl md:text-7xl font-extrabold mb-6 leading-tight">
               Get in{" "}
@@ -91,7 +107,7 @@ export default function ContactPage() {
               </span>
             </h1>
             <p className="text-xl text-white/70 max-w-2xl mx-auto">
-              Have a question, feedback, or partnership idea? Our team is here to help. Drop us a message and we'll get back to you shortly.
+              Have a question, feedback, or partnership idea? Our team is here to help. Drop us a message and we&apos;ll get back to you shortly.
             </p>
           </motion.div>
         </div>
@@ -132,24 +148,27 @@ export default function ContactPage() {
             viewport={{ once: true }}
           >
             <h2 className="text-3xl font-extrabold text-gray-900 mb-2">Send us a message</h2>
-            <p className="text-gray-500 mb-8">Fill out the form and we'll respond within 24 hours.</p>
+            <p className="text-gray-500 mb-8">Fill out the form and we&apos;ll respond within 24 hours.</p>
 
             {submitted ? (
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
+                role="status"
+                aria-live="polite"
                 className="bg-emerald-50 border border-emerald-200 rounded-2xl p-10 text-center"
               >
-                <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
+                <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto mb-4" aria-hidden="true" />
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">Message Sent!</h3>
-                <p className="text-gray-600">Thanks for reaching out, {form.name}. We'll get back to you at <span className="font-semibold">{form.email}</span> within 24 hours.</p>
+                <p className="text-gray-600">Thanks for reaching out, {form.name}. We&apos;ll get back to you at <span className="font-semibold">{form.email}</span> within 24 hours.</p>
               </motion.div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Your Name</label>
+                    <label htmlFor="contact-name" className="block text-sm font-semibold text-gray-700 mb-2">Your Name</label>
                     <input
+                      id="contact-name"
                       type="text"
                       required
                       value={form.name}
@@ -159,8 +178,9 @@ export default function ContactPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
+                    <label htmlFor="contact-email" className="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
                     <input
+                      id="contact-email"
                       type="email"
                       required
                       value={form.email}
@@ -172,8 +192,9 @@ export default function ContactPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Subject</label>
+                  <label htmlFor="contact-subject" className="block text-sm font-semibold text-gray-700 mb-2">Subject</label>
                   <input
+                    id="contact-subject"
                     type="text"
                     required
                     value={form.subject}
@@ -184,8 +205,9 @@ export default function ContactPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Message</label>
+                  <label htmlFor="contact-message" className="block text-sm font-semibold text-gray-700 mb-2">Message</label>
                   <textarea
+                    id="contact-message"
                     required
                     rows={5}
                     value={form.message}
@@ -272,7 +294,7 @@ export default function ContactPage() {
       </section>
 
       {/* FAQ */}
-      <section className="bg-gray-50 py-20 px-6">
+      <section id="faq" className="bg-gray-50 py-20 px-6">
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-12">
             <span className="text-sm font-bold text-indigo-600 uppercase tracking-widest mb-3 block">FAQ</span>
@@ -289,8 +311,10 @@ export default function ContactPage() {
                 className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm"
               >
                 <button
+                  type="button"
+                  aria-expanded={openFaq === i}
                   onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  className="w-full flex items-center justify-between px-6 py-5 text-left hover:bg-gray-50 transition-colors"
+                  className="w-full flex items-center justify-between px-6 py-5 text-left hover:bg-gray-50 transition-colors cursor-pointer"
                 >
                   <span className="font-semibold text-gray-900">{faq.q}</span>
                   <motion.span

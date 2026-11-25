@@ -9,307 +9,32 @@ import {
   Sparkles, 
   Info, 
   Calendar, 
-  Sun, 
-  Moon, 
   CloudSun, 
   Plane,
-  AlertCircle,
-  HelpCircle,
   TrendingUp
 } from "lucide-react";
-import { TripInfo } from "./chatbox";
+import type { CompanionData, CompanionEvent, ItineraryDay, LocationDetails, TripInfo } from "@/types/trip";
+import {
+  buildGoogleFlightsUrl,
+  calculateTimezoneOffset,
+  convertCurrency,
+  detectLocationDetails,
+  FALLBACK_RATES,
+  getCurrencySymbol,
+  isGoodBusinessHour,
+} from "@/lib/travel-utils";
 import { useAuth } from '@clerk/nextjs';
 import { useUserDetail, useTripDetail } from '@/app/provider';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import type { Id } from '@/convex/_generated/dataModel';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from "motion/react";
 
-export interface LocationDetails {
-  city: string;
-  country: string;
-  currencyCode: string;
-  currencySymbol: string;
-  timezone: string;
-  timezoneName: string;
-  flag: string;
-}
-
-export interface AIResponse {
-  origin: LocationDetails;
-  destination: LocationDetails;
-  isDomestic: boolean;
-  timezoneOffsetDifference: number;
-  recommendations: {
-    category: string;
-    title: string;
-    description: string;
-  }[];
-  events: {
-    name: string;
-    date: string;
-    description: string;
-    type: string;
-  }[];
-}
-
-// Client-side fallback database
-const DEFAULT_INDIA: LocationDetails = {
-  city: "Delhi",
-  country: "India",
-  currencyCode: "INR",
-  currencySymbol: "₹",
-  timezone: "Asia/Kolkata",
-  timezoneName: "IST",
-  flag: "🇮🇳"
-};
-
-const DEFAULT_US: LocationDetails = {
-  city: "New York",
-  country: "United States",
-  currencyCode: "USD",
-  currencySymbol: "$",
-  timezone: "America/New_York",
-  timezoneName: "EST",
-  flag: "🇺🇸"
-};
-
-const GEO_DATABASE: { keywords: string[]; details: LocationDetails }[] = [
-  {
-    keywords: [
-      "india", "delhi", "mumbai", "bombay", "bangalore", "bengaluru", "kolkata", "calcutta", 
-      "chennai", "madras", "hyderabad", "pune", "jaipur", "goa", "kerala", "agra", "varanasi",
-      "nainital", "jhansi", "dehradun", "rishikesh", "haridwar", "shimla", "manali", "uttarakhand",
-      "uttar pradesh", "rajasthan", "himachal", "punjab", "haryana", "kashmir", "srinagar", "ladakh",
-      "amritsar", "bhopal", "indore", "lucknow", "kanpur", "ayodhya", "mathura", "vrindavan",
-      "darjeeling", "mussoorie", "kodaikanal", "ooty", "munnar", "alleppey", "mysore", "kochi"
-    ],
-    details: {
-      city: "Delhi",
-      country: "India",
-      currencyCode: "INR",
-      currencySymbol: "₹",
-      timezone: "Asia/Kolkata",
-      timezoneName: "IST",
-      flag: "🇮🇳"
-    }
-  },
-  {
-    keywords: ["japan", "tokyo", "osaka", "kyoto", "yokohama", "sapporo", "fukuoka", "nagoya", "hiroshima", "nara", "okinawa"],
-    details: {
-      city: "Tokyo",
-      country: "Japan",
-      currencyCode: "JPY",
-      currencySymbol: "¥",
-      timezone: "Asia/Tokyo",
-      timezoneName: "JST",
-      flag: "🇯🇵"
-    }
-  },
-  {
-    keywords: ["united states", "usa", "america", "new york", "san francisco", "los angeles", "chicago", "miami", "boston", "seattle", "washington", "las vegas", "hawaii", "california", "texas"],
-    details: {
-      city: "New York",
-      country: "United States",
-      currencyCode: "USD",
-      currencySymbol: "$",
-      timezone: "America/New_York",
-      timezoneName: "EST",
-      flag: "🇺🇸"
-    }
-  },
-  {
-    keywords: ["united kingdom", "uk", "london", "manchester", "edinburgh", "birmingham", "scotland", "england", "wales", "ireland", "dublin"],
-    details: {
-      city: "London",
-      country: "United Kingdom",
-      currencyCode: "GBP",
-      currencySymbol: "£",
-      timezone: "Europe/London",
-      timezoneName: "GMT",
-      flag: "🇬🇧"
-    }
-  },
-  {
-    keywords: ["france", "paris", "nice", "lyon", "marseille"],
-    details: {
-      city: "Paris",
-      country: "France",
-      currencyCode: "EUR",
-      currencySymbol: "€",
-      timezone: "Europe/Paris",
-      timezoneName: "CET",
-      flag: "🇫🇷"
-    }
-  },
-  {
-    keywords: ["germany", "berlin", "munich", "frankfurt", "hamburg", "cologne"],
-    details: {
-      city: "Berlin",
-      country: "Germany",
-      currencyCode: "EUR",
-      currencySymbol: "€",
-      timezone: "Europe/Berlin",
-      timezoneName: "CET",
-      flag: "🇩🇪"
-    }
-  },
-  {
-    keywords: ["italy", "rome", "milan", "venice", "florence", "naples"],
-    details: {
-      city: "Rome",
-      country: "Italy",
-      currencyCode: "EUR",
-      currencySymbol: "€",
-      timezone: "Europe/Rome",
-      timezoneName: "CET",
-      flag: "🇮🇹"
-    }
-  },
-  {
-    keywords: ["spain", "madrid", "barcelona", "seville", "valencia", "mallorca"],
-    details: {
-      city: "Madrid",
-      country: "Spain",
-      currencyCode: "EUR",
-      currencySymbol: "€",
-      timezone: "Europe/Madrid",
-      timezoneName: "CET",
-      flag: "🇪🇸"
-    }
-  },
-  {
-    keywords: ["singapore"],
-    details: {
-      city: "Singapore",
-      country: "Singapore",
-      currencyCode: "SGD",
-      currencySymbol: "S$",
-      timezone: "Asia/Singapore",
-      timezoneName: "SGT",
-      flag: "🇸🇬"
-    }
-  },
-  {
-    keywords: ["australia", "sydney", "melbourne", "brisbane", "perth", "adelaide", "cairns"],
-    details: {
-      city: "Sydney",
-      country: "Australia",
-      currencyCode: "AUD",
-      currencySymbol: "A$",
-      timezone: "Australia/Sydney",
-      timezoneName: "AEST",
-      flag: "🇦🇺"
-    }
-  },
-  {
-    keywords: ["canada", "toronto", "vancouver", "montreal", "ottawa", "calgary"],
-    details: {
-      city: "Toronto",
-      country: "Canada",
-      currencyCode: "CAD",
-      currencySymbol: "C$",
-      timezone: "America/Toronto",
-      timezoneName: "EST",
-      flag: "🇨🇦"
-    }
-  },
-  {
-    keywords: ["dubai", "abu dhabi", "uae", "united arab emirates"],
-    details: {
-      city: "Dubai",
-      country: "United Arab Emirates",
-      currencyCode: "AED",
-      currencySymbol: "د.إ",
-      timezone: "Asia/Dubai",
-      timezoneName: "GST",
-      flag: "🇦🇪"
-    }
-  },
-  {
-    keywords: ["thailand", "bangkok", "phuket", "pattaya", "chiang mai", "krabi"],
-    details: {
-      city: "Bangkok",
-      country: "Thailand",
-      currencyCode: "THB",
-      currencySymbol: "฿",
-      timezone: "Asia/Bangkok",
-      timezoneName: "ICT",
-      flag: "🇹🇭"
-    }
-  },
-  {
-    keywords: ["indonesia", "bali", "jakarta", "ubud", "denpasar"],
-    details: {
-      city: "Bali",
-      country: "Indonesia",
-      currencyCode: "IDR",
-      currencySymbol: "Rp",
-      timezone: "Asia/Jakarta",
-      timezoneName: "WIB",
-      flag: "🇮🇩"
-    }
-  },
-  {
-    keywords: ["switzerland", "zurich", "geneva", "lucerne", "interlaken"],
-    details: {
-      city: "Zurich",
-      country: "Switzerland",
-      currencyCode: "CHF",
-      currencySymbol: "CHF",
-      timezone: "Europe/Zurich",
-      timezoneName: "CET",
-      flag: "🇨🇭"
-    }
-  }
-];
-
-export const detectLocationDetails = (placeName: string, isOrigin: boolean): LocationDetails => {
-  if (!placeName) return isOrigin ? DEFAULT_INDIA : DEFAULT_US;
-  
-  const searchStr = placeName.toLowerCase();
-  for (const entry of GEO_DATABASE) {
-    for (const key of entry.keywords) {
-      if (searchStr.includes(key)) {
-        const cityPart = placeName.split(',')[0].trim();
-        return {
-          ...entry.details,
-          city: cityPart || entry.details.city
-        };
-      }
-    }
-  }
-  
-  const parts = placeName.split(',');
-  const city = parts[0].trim();
-  const country = parts.length > 1 ? parts[1].trim() : "Unknown";
-  
-  return {
-    city: city || (isOrigin ? "Origin" : "Destination"),
-    country: country || (isOrigin ? "India" : "United States"),
-    currencyCode: isOrigin ? "INR" : "USD",
-    currencySymbol: isOrigin ? "₹" : "$",
-    timezone: isOrigin ? "Asia/Kolkata" : "UTC",
-    timezoneName: isOrigin ? "IST" : "UTC",
-    flag: isOrigin ? "🇮🇳" : "🌐"
-  };
-};
-
-const FALLBACK_RATES: Record<string, number> = {
-  USD: 1.0,
-  INR: 83.50,
-  JPY: 158.00,
-  EUR: 0.92,
-  GBP: 0.79,
-  AUD: 1.50,
-  CAD: 1.36,
-  SGD: 1.35,
-  AED: 3.67,
-  THB: 36.50,
-  IDR: 16300.0,
-  CHF: 0.90,
-};
+export type { LocationDetails };
+export type AIResponse = CompanionData;
+export { detectLocationDetails };
 
 export const DEFAULT_RECOMMENDATIONS = [
   {
@@ -371,7 +96,7 @@ const TripPlannerAddon = ({ trip, initialData }: AddonProps) => {
   const updateItinerary = useMutation(api.tripDetail.updateTripItinerary);
   const [selectedEventIndex, setSelectedEventIndex] = useState<number | null>(null);
 
-  const handleAddEventToItinerary = async (event: any, dayIndex: number) => {
+  const handleAddEventToItinerary = async (event: CompanionEvent, dayIndex: number) => {
     // Determine active trip detail
     const activeTrip = trip || tripDetailInfo;
     if (!activeTrip || !userDetail?._id) {
@@ -404,13 +129,14 @@ const TripPlannerAddon = ({ trip, initialData }: AddonProps) => {
       }
       currentItinerary[dayIndex].activities.push(newActivity);
 
-      const updatedTrip = {
+      const updatedTrip: TripInfo = {
         ...activeTrip,
         itinerary: currentItinerary
       };
 
-      // Extract raw tripId (from useParams or the prop)
-      const targetTripId = (activeTrip as any).tripId || (tripDetailInfo as any)?.tripId;
+      const targetTripId =
+        (activeTrip as TripInfo & { tripId?: string }).tripId ||
+        (tripDetailInfo as (TripInfo & { tripId?: string }) | null)?.tripId;
       if (!targetTripId) {
         toast.error("Trip ID not found");
         return;
@@ -418,7 +144,7 @@ const TripPlannerAddon = ({ trip, initialData }: AddonProps) => {
 
       const result = await updateItinerary({
         tripId: targetTripId,
-        uid: userDetail._id,
+        uid: userDetail._id as Id<"UserTable">,
         tripDetail: updatedTrip
       });
 
@@ -531,7 +257,7 @@ const TripPlannerAddon = ({ trip, initialData }: AddonProps) => {
     if (!userDetail?._id) return;
     if (dbCredits <= 0) return;
     try {
-      const updatedUser = await decrementAICredits({ uid: userDetail._id });
+      const updatedUser = await decrementAICredits({ uid: userDetail._id as Id<"UserTable"> });
       setUserDetail(updatedUser);
       await triggerAIPrediction(originQuery, destinationQuery);
     } catch (err) {
@@ -550,16 +276,12 @@ const TripPlannerAddon = ({ trip, initialData }: AddonProps) => {
   const isDomestic = aiData !== null ? aiData.isDomestic : (origin.country === destination.country);
 
   // Currency Calculations
-  const conversionRate = useMemo(() => {
-    const fromUSD = rates[sourceCurrency] || FALLBACK_RATES[sourceCurrency] || 1;
-    const toUSD = rates[targetCurrency] || FALLBACK_RATES[targetCurrency] || 1;
-    return toUSD / fromUSD;
-  }, [rates, sourceCurrency, targetCurrency]);
-
-  const convertedValue = useMemo(() => {
+  const { rate: conversionRate, converted: convertedNumeric } = useMemo(() => {
     const amtNum = parseFloat(amount) || 0;
-    return (amtNum * conversionRate).toFixed(2);
-  }, [amount, conversionRate]);
+    return convertCurrency(amtNum, sourceCurrency, targetCurrency, rates);
+  }, [amount, rates, sourceCurrency, targetCurrency]);
+
+  const convertedValue = convertedNumeric.toFixed(2);
 
   const handleSwapCurrencies = () => {
     const temp = sourceCurrency;
@@ -602,32 +324,7 @@ const TripPlannerAddon = ({ trip, initialData }: AddonProps) => {
     if (aiData?.timezoneOffsetDifference !== undefined) {
       return aiData.timezoneOffsetDifference;
     }
-    
-    // Fallback calculation using Intl
-    try {
-      const getOffset = (tz: string) => {
-        const d = new Date();
-        const formatter = new Intl.DateTimeFormat("en-US", {
-          timeZone: tz,
-          timeZoneName: "longOffset"
-        });
-        const parts = formatter.formatToParts(d);
-        const offsetString = parts.find(p => p.type === "timeZoneName")?.value || "";
-        
-        // formats like GMT+5:30, GMT-8, GMT
-        if (!offsetString || offsetString === "GMT") return 0;
-        const match = offsetString.match(/GMT([+-])(\d+):?(\d*)/);
-        if (!match) return 0;
-        const sign = match[1] === "+" ? 1 : -1;
-        const hours = parseInt(match[2]);
-        const minutes = parseInt(match[3] || "0");
-        return sign * (hours + minutes / 60);
-      };
-      
-      return getOffset(destination.timezone) - getOffset(origin.timezone);
-    } catch {
-      return 0;
-    }
+    return calculateTimezoneOffset(origin.timezone, destination.timezone);
   }, [origin.timezone, destination.timezone, aiData]);
 
   // Adjusting timezone slider representation
@@ -656,17 +353,6 @@ const TripPlannerAddon = ({ trip, initialData }: AddonProps) => {
     }
   }, [offsetHoursDiff, origin.city, destination.city, isDomestic]);
 
-  // Check if current time in dest is suitable for calls (9 AM - 9 PM)
-  const isGoodBusinessHour = (timeStr: string) => {
-    const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/);
-    if (!match) return true;
-    let hour = parseInt(match[1]);
-    const ampm = match[3];
-    if (ampm === "PM" && hour !== 12) hour += 12;
-    if (ampm === "AM" && hour === 12) hour = 0;
-    return hour >= 9 && hour <= 21;
-  };
-
   const destCallingStatus = useMemo(() => {
     const good = isGoodBusinessHour(destPlannedTime);
     return {
@@ -678,18 +364,7 @@ const TripPlannerAddon = ({ trip, initialData }: AddonProps) => {
   const recommendations = aiData?.recommendations || DEFAULT_RECOMMENDATIONS;
 
   const googleFlightsUrl = useMemo(() => {
-    const cleanCity = (name: string) => {
-      if (!name) return "";
-      return name.split(",")[0].trim();
-    };
-    const originCity = cleanCity(origin.city);
-    const destCity = cleanCity(destination.city);
-
-    const date = new Date();
-    date.setDate(date.getDate() + 7);
-    const dateString = date.toISOString().split("T")[0]; // YYYY-MM-DD
-    const query = `Flights to ${destCity} from ${originCity} on ${dateString}`;
-    return `https://www.google.com/travel/flights?q=${encodeURIComponent(query)}`;
+    return buildGoogleFlightsUrl(origin.city, destination.city);
   }, [origin.city, destination.city]);
 
   return (
@@ -704,8 +379,9 @@ const TripPlannerAddon = ({ trip, initialData }: AddonProps) => {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-[9px] font-bold text-neutral-450 uppercase tracking-wider block">From Location</label>
+              <label htmlFor="addon-origin-input" className="text-[9px] font-bold text-neutral-450 uppercase tracking-wider block">From Location</label>
               <input 
+                id="addon-origin-input"
                 type="text" 
                 value={originInput}
                 onChange={(e) => setOriginInput(e.target.value)}
@@ -714,8 +390,9 @@ const TripPlannerAddon = ({ trip, initialData }: AddonProps) => {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-[9px] font-bold text-neutral-450 uppercase tracking-wider block">To Destination</label>
+              <label htmlFor="addon-destination-input" className="text-[9px] font-bold text-neutral-450 uppercase tracking-wider block">To Destination</label>
               <input 
+                id="addon-destination-input"
                 type="text" 
                 value={destinationInput}
                 onChange={(e) => setDestinationInput(e.target.value)}
@@ -725,6 +402,7 @@ const TripPlannerAddon = ({ trip, initialData }: AddonProps) => {
             </div>
           </div>
           <button 
+            type="button"
             onClick={handleAnalyzeRoute}
             className="w-full py-2.5 bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 rounded-xl text-xs font-bold hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-all cursor-pointer shadow-sm active:scale-[0.98]"
           >
@@ -737,12 +415,12 @@ const TripPlannerAddon = ({ trip, initialData }: AddonProps) => {
       <div className="flex flex-col gap-4 mb-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-orange-500 fill-orange-500/10" />
+            <Sparkles className="w-5 h-5 text-orange-500 fill-orange-500/10" aria-hidden="true" />
             <h2 className="text-xl font-extrabold text-neutral-800 dark:text-neutral-100 tracking-tight">Trip Companion</h2>
           </div>
           {loadingAI && (
-            <div className="flex items-center gap-1.5 text-xs text-neutral-450">
-              <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+            <div className="flex items-center gap-1.5 text-xs text-neutral-450" role="status">
+              <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" aria-hidden="true" />
               <span>AI Syncing...</span>
             </div>
           )}
@@ -754,26 +432,39 @@ const TripPlannerAddon = ({ trip, initialData }: AddonProps) => {
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex bg-neutral-50 dark:bg-neutral-800/40 p-1 rounded-xl border border-neutral-100 dark:border-neutral-800/80">
+        <div
+          className="flex bg-neutral-50 dark:bg-neutral-800/40 p-1 rounded-xl border border-neutral-100 dark:border-neutral-800/80"
+          role="tablist"
+          aria-label="Trip companion utilities"
+        >
           <button 
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "currency"}
             onClick={() => setActiveTab("currency")}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeTab === 'currency' ? 'bg-white dark:bg-neutral-800 shadow-sm text-neutral-950 dark:text-white' : 'text-neutral-500 hover:text-neutral-850 dark:hover:text-neutral-355'}`}
           >
-            <Coins className="w-3.5 h-3.5" />
+            <Coins className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Currency</span>
           </button>
           <button 
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "timezone"}
             onClick={() => setActiveTab("timezone")}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeTab === 'timezone' ? 'bg-white dark:bg-neutral-800 shadow-sm text-neutral-950 dark:text-white' : 'text-neutral-500 hover:text-neutral-850 dark:hover:text-neutral-355'}`}
           >
-            <Clock className="w-3.5 h-3.5" />
+            <Clock className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Timezone</span>
           </button>
           <button 
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "events"}
             onClick={() => setActiveTab("events")}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeTab === 'events' ? 'bg-white dark:bg-neutral-800 shadow-sm text-neutral-950 dark:text-white' : 'text-neutral-500 hover:text-neutral-850 dark:hover:text-neutral-355'}`}
           >
-            <Calendar className="w-3.5 h-3.5" />
+            <Calendar className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Events</span>
           </button>
         </div>
@@ -835,8 +526,9 @@ const TripPlannerAddon = ({ trip, initialData }: AddonProps) => {
           <div className="grid grid-cols-5 gap-2 items-center">
             {/* Source */}
             <div className="col-span-2 space-y-1">
-              <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">From</label>
+              <label htmlFor="addon-source-currency" className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">From</label>
               <select 
+                id="addon-source-currency"
                 value={sourceCurrency}
                 onChange={(e) => setSourceCurrency(e.target.value)}
                 className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-800 rounded-xl p-2.5 text-sm font-bold text-neutral-800 dark:text-neutral-100 focus:outline-none"
@@ -850,18 +542,21 @@ const TripPlannerAddon = ({ trip, initialData }: AddonProps) => {
             {/* Swap Button */}
             <div className="col-span-1 flex justify-center pt-5">
               <button 
+                type="button"
                 onClick={handleSwapCurrencies}
+                aria-label="Swap source and target currencies"
                 className="p-2 bg-neutral-50 dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-750 border border-neutral-100 dark:border-neutral-850 rounded-xl cursor-pointer shadow-sm hover:scale-105 transition-all text-neutral-600 dark:text-neutral-350"
                 title="Swap Currencies"
               >
-                <ArrowLeftRight className="w-3.5 h-3.5" />
+                <ArrowLeftRight className="w-3.5 h-3.5" aria-hidden="true" />
               </button>
             </div>
 
             {/* Target */}
             <div className="col-span-2 space-y-1">
-              <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">To</label>
+              <label htmlFor="addon-target-currency" className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block">To</label>
               <select 
+                id="addon-target-currency"
                 value={targetCurrency}
                 onChange={(e) => setTargetCurrency(e.target.value)}
                 className="w-full bg-neutral-50 dark:bg-neutral-800 border border-neutral-100 dark:border-neutral-800 rounded-xl p-2.5 text-sm font-bold text-neutral-800 dark:text-neutral-100 focus:outline-none"
@@ -876,15 +571,16 @@ const TripPlannerAddon = ({ trip, initialData }: AddonProps) => {
           {/* Amount Input & Live Display */}
           <div className="bg-neutral-50 dark:bg-neutral-800/40 p-4 border border-neutral-100 dark:border-neutral-800 rounded-2xl">
             <div className="flex items-center justify-between mb-2">
-              <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Amount</label>
+              <label htmlFor="addon-currency-amount" className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Amount</label>
               <span className="text-[10px] font-semibold text-neutral-400">
                 1 {sourceCurrency} = {conversionRate.toFixed(4)} {targetCurrency}
               </span>
             </div>
             
             <div className="flex items-center gap-3">
-              <span className="text-xl font-bold text-neutral-400">{sourceCurrency === "INR" ? "₹" : sourceCurrency === "USD" ? "$" : sourceCurrency === "JPY" ? "¥" : sourceCurrency === "EUR" ? "€" : sourceCurrency === "GBP" ? "£" : ""}</span>
+              <span className="text-xl font-bold text-neutral-400" aria-hidden="true">{getCurrencySymbol(sourceCurrency)}</span>
               <input 
+                id="addon-currency-amount"
                 type="number"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
@@ -983,7 +679,9 @@ const TripPlannerAddon = ({ trip, initialData }: AddonProps) => {
                   {sliderHoursOffset === 0 ? "Current Time" : sliderHoursOffset > 0 ? `+${sliderHoursOffset}h` : `${sliderHoursOffset}h`}
                 </span>
               </div>
+              <label htmlFor="addon-timezone-slider" className="sr-only">Adjust timezone comparison offset in hours</label>
               <input 
+                id="addon-timezone-slider"
                 type="range"
                 min="0"
                 max="24"
@@ -1074,7 +772,7 @@ const TripPlannerAddon = ({ trip, initialData }: AddonProps) => {
                             Select Day to Add:
                           </label>
                           <div className="flex gap-1.5 flex-wrap">
-                            {activeTrip.itinerary.map((day: any, dIdx: number) => (
+                            {activeTrip.itinerary.map((day: ItineraryDay, dIdx: number) => (
                               <button
                                 key={dIdx}
                                 onClick={() => handleAddEventToItinerary(event, dIdx)}

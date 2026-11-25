@@ -8,7 +8,7 @@ export const createTripDetail = mutation({
         tripDetail: v.any(),
     },
     handler: async (ctx, args) => {
-        const result = await ctx.db.insert("TripDetailTable", {
+        await ctx.db.insert("TripDetailTable", {
             tripId: args.tripId,
             uid: args.uid,
             tripDetail: args.tripDetail,

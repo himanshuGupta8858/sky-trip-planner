@@ -7,7 +7,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 const menuOptions = [
     {
@@ -37,12 +37,23 @@ const menuOptions = [
 ]
 
 const Header = () => {
-    const { user, isSignedIn } = useUser();
+    const { isSignedIn } = useUser();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
     const path = usePathname();
     const router = useRouter();
     const { favorites, removeFavorite } = useFavorites();
+
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setIsFavoritesOpen(false);
+                setIsMenuOpen(false);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     const handlePlanFavorite = (destinationName: string) => {
         setIsFavoritesOpen(false);
@@ -55,24 +66,27 @@ const Header = () => {
             <div className='max-w-7xl mx-auto flex justify-between items-center'>
                 {/* Logo Section */}
                 <div className='flex gap-2 items-center'>
-                    <Link href="/" className='flex gap-2 items-center'>
-                        <Image src="/logo.svg" alt="Logo" width={40} height={40} className="w-10 h-10" />
-                        <h1 className='text-2xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent'>SkyTrip</h1>
+                    <Link href="/" className='flex gap-2 items-center' aria-label="SkyTrip Home">
+                        <Image src="/logo.svg" alt="SkyTrip logo" width={40} height={40} className="w-10 h-10" />
+                        <span className='text-2xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent'>SkyTrip</span>
                     </Link>
                 </div>
 
                 {/* Desktop Navigation */}
-                <div className='hidden md:flex gap-8 items-center'>
+                <nav aria-label="Primary navigation" className='hidden md:flex gap-8 items-center'>
                     {menuOptions.map((option) => (
                         <Link
                             key={option.name}
                             href={option.href}
-                            className='text-base font-medium text-gray-600 hover:text-primary transition-colors hover:scale-105 active:scale-95'
+                            aria-current={path === option.href ? 'page' : undefined}
+                            className={`text-base font-medium transition-colors hover:text-primary hover:scale-105 active:scale-95 ${
+                                path === option.href ? 'text-primary font-semibold' : 'text-gray-600'
+                            }`}
                         >
                             {option.name}
                         </Link>
                     ))}
-                </div>
+                </nav>
 
                 {/* Desktop Actions & Auth */}
                 <div className='hidden md:flex items-center gap-3'>
@@ -139,18 +153,25 @@ const Header = () => {
                         }} />
                     )}
                     <button
+                        type="button"
                         onClick={() => setIsMenuOpen(!isMenuOpen)}
                         className='p-2 rounded-full hover:bg-gray-100 transition-colors'
-                        aria-label="Toggle menu"
+                        aria-label="Toggle navigation menu"
+                        aria-expanded={isMenuOpen}
+                        aria-controls="mobile-navigation-menu"
                     >
-                        {isMenuOpen ? <X className="h-6 w-6 text-gray-600" /> : <Menu className="h-6 w-6 text-gray-600" />}
+                        {isMenuOpen ? <X className="h-6 w-6 text-gray-600" aria-hidden="true" /> : <Menu className="h-6 w-6 text-gray-600" aria-hidden="true" />}
                     </button>
                 </div>
             </div>
 
             {/* Mobile Navigation Dropdown */}
             {isMenuOpen && (
-                <div className='md:hidden absolute top-full left-0 w-full bg-white border-b border-gray-100 shadow-xl py-6 px-4 flex flex-col gap-4 animate-in slide-in-from-top-5 duration-200 z-50'>
+                <nav
+                    id="mobile-navigation-menu"
+                    aria-label="Mobile navigation"
+                    className='md:hidden absolute top-full left-0 w-full bg-white border-b border-gray-100 shadow-xl py-6 px-4 flex flex-col gap-4 animate-in slide-in-from-top-5 duration-200 z-50'
+                >
                     {menuOptions.map((option) => (
                         <Link
                             key={option.name}
@@ -199,13 +220,18 @@ const Header = () => {
                             )}
                         </div>
                     )}
-                </div>
+                </nav>
             )}
 
             {/* Favorites Slide-over Modal / Drawer */}
             <AnimatePresence>
                 {isFavoritesOpen && (
-                    <div className="fixed inset-0 z-50 flex justify-end">
+                    <div
+                        className="fixed inset-0 z-50 flex justify-end"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="favorites-drawer-title"
+                    >
                         {/* Backdrop */}
                         <motion.div
                             initial={{ opacity: 0 }}
@@ -226,17 +252,19 @@ const Header = () => {
                             {/* Header */}
                             <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-rose-500 to-pink-600 text-white">
                                 <div className="flex items-center gap-2">
-                                    <Heart className="w-6 h-6 fill-white" />
-                                    <h2 className="text-xl font-bold">Saved Favorites</h2>
+                                    <Heart className="w-6 h-6 fill-white" aria-hidden="true" />
+                                    <h2 id="favorites-drawer-title" className="text-xl font-bold">Saved Favorites</h2>
                                     <span className="bg-white/20 px-2.5 py-0.5 rounded-full text-xs font-semibold">
                                         {favorites.length}
                                     </span>
                                 </div>
                                 <button
+                                    type="button"
                                     onClick={() => setIsFavoritesOpen(false)}
+                                    aria-label="Close favorites drawer"
                                     className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
                                 >
-                                    <X className="w-5 h-5" />
+                                    <X className="w-5 h-5" aria-hidden="true" />
                                 </button>
                             </div>
 
@@ -298,11 +326,13 @@ const Header = () => {
                                                     </button>
 
                                                     <button
+                                                        type="button"
                                                         onClick={() => removeFavorite(item.id)}
                                                         className="text-gray-400 hover:text-rose-600 p-1.5 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
                                                         title="Remove from favorites"
+                                                        aria-label={`Remove ${item.name} from favorites`}
                                                     >
-                                                        <Trash2 className="w-4 h-4" />
+                                                        <Trash2 className="w-4 h-4" aria-hidden="true" />
                                                     </button>
                                                 </div>
                                             </div>

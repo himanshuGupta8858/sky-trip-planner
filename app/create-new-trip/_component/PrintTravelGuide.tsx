@@ -1,11 +1,12 @@
 "use client";
-import React, { useEffect, useState } from 'react';
-import { TripInfo } from './chatbox';
-import { AIResponse, detectLocationDetails, DEFAULT_RECOMMENDATIONS } from './TripPlannerAddon';
+import { detectLocationDetails } from "@/lib/travel-utils";
+import type { Activity, CompanionData, CompanionRecommendation, TripInfo } from "@/types/trip";
+import React, { useEffect, useState } from "react";
+import { DEFAULT_RECOMMENDATIONS } from "./TripPlannerAddon";
 
 interface PrintTravelGuideProps {
-    trip: TripInfo | undefined;
-    addonData?: AIResponse | null;
+  trip: TripInfo | undefined;
+  addonData?: CompanionData | null;
 }
 
 const PrintTravelGuide: React.FC<PrintTravelGuideProps> = ({ trip, addonData }) => {
@@ -150,7 +151,7 @@ const PrintTravelGuide: React.FC<PrintTravelGuideProps> = ({ trip, addonData }) 
                         </div>
                         <div>
                             <span className="text-[10px] uppercase font-bold text-neutral-400 block tracking-wider">Travelers</span>
-                            <span className="font-bold text-neutral-800 text-sm">{(trip as any).people_size || (trip as any).group_size}</span>
+                            <span className="font-bold text-neutral-800 text-sm">{trip.people_size || trip.group_size}</span>
                         </div>
                     </div>
                 </div>
@@ -198,7 +199,7 @@ const PrintTravelGuide: React.FC<PrintTravelGuideProps> = ({ trip, addonData }) 
                                     </p>
 
                                     <p className="text-xs text-neutral-600 leading-relaxed italic">
-                                        "{hotel.description}"
+                                        &ldquo;{hotel.description}&rdquo;
                                     </p>
 
                                     <div className="flex justify-between items-center pt-2 border-t border-neutral-100 text-xs">
@@ -238,7 +239,7 @@ const PrintTravelGuide: React.FC<PrintTravelGuideProps> = ({ trip, addonData }) 
                             </div>
 
                             <div className="space-y-4">
-                                {dayData.activities?.map((activity: any, aIndex: number) => {
+                                {dayData.activities?.map((activity: Activity, aIndex: number) => {
                                     const activityMapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.place_name + ' ' + activity.place_address)}`;
                                     
                                     return (
@@ -347,7 +348,7 @@ const PrintTravelGuide: React.FC<PrintTravelGuideProps> = ({ trip, addonData }) 
                     </div>
 
                     <div className="space-y-4">
-                        {recommendations.map((rec: any, idx: number) => (
+                        {recommendations.map((rec: CompanionRecommendation, idx: number) => (
                             <div key={idx} className="no-break border border-neutral-200 rounded-xl p-5 bg-white shadow-sm space-y-1.5">
                                 <span className="text-[9px] font-black uppercase tracking-wider text-orange-600 bg-orange-50 border border-orange-100 px-2.5 py-0.5 rounded-full inline-block">
                                     {rec.category}

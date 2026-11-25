@@ -2,7 +2,7 @@
 import React from "react";
 import TripPlannerAddon from "@/app/create-new-trip/_component/TripPlannerAddon";
 import Footer from "@/app/_components/footer";
-import { Sparkles, Globe, Shield, Users, Plane, MapPin, Star } from "lucide-react";
+import { Sparkles, Globe, Shield } from "lucide-react";
 import { motion } from "motion/react";
 
 export default function StandaloneConverterPage() {
@@ -71,7 +71,7 @@ export default function StandaloneConverterPage() {
             <div>
               <h3 className="font-bold text-neutral-900 dark:text-neutral-50 text-sm">Offline Failsafe</h3>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 leading-normal">
-                Static conversion and timezone computations run 100% locally and instantly if you're offline or out of credits.
+                Static conversion and timezone computations run 100% locally and instantly if you&apos;re offline or out of credits.
               </p>
             </div>
           </div>

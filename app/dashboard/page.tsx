@@ -1,121 +1,51 @@
 "use client"
-import React, { useEffect, useState } from 'react';
-import { useUserDetail } from '../provider';
-import { useConvex } from 'convex/react';
-import { api } from '@/convex/_generated/api';
-import Link from 'next/link';
-import { Plane, Hotel, MapPin, DollarSign, Compass, ArrowLeft, BarChart3, PieChart, CheckCircle2 } from 'lucide-react';
-import { ShimmerButton } from '@/components/ui/shimmer-button';
-
-// Haversine formula to compute distance in km
-function getHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-    const R = 6371; // earth radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-        Math.sin(dLat/2) * Math.sin(dLat/2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-        Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-}
-
-const parsePrice = (priceStr: any): number => {
-    if (typeof priceStr === 'number') return priceStr;
-    if (!priceStr) return 0;
-    const cleaned = String(priceStr).replace(/[^0-9.]/g, '');
-    return parseFloat(cleaned) || 0;
-};
+import { ShimmerButton } from "@/components/ui/shimmer-button";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+import { calculateTripCost, calculateTripDistance } from "@/lib/travel-utils";
+import type { TripRecord } from "@/types/trip";
+import { useConvex } from "convex/react";
+import { ArrowLeft, BarChart3, CheckCircle2, Compass, DollarSign, MapPin, PieChart, Plane } from "lucide-react";
+import Link from "next/link";
+import React, { useCallback, useEffect, useState } from "react";
+import { useUserDetail } from "../provider";
 
 const getCountry = (destination: string) => {
-    if (!destination) return 'Unknown';
-    const parts = destination.split(',');
-    return parts[parts.length - 1].trim();
+  if (!destination) return "Unknown";
+  const parts = destination.split(",");
+  return parts[parts.length - 1].trim();
 };
 
 const getCity = (destination: string) => {
-    if (!destination) return 'Unknown';
-    return destination.split(',')[0].trim();
-};
-
-const calculateTripDistance = (trip: any): number => {
-    let total = 0;
-    const itinerary = trip.itinerary || [];
-    const hotel = trip.hotels?.[0];
-    const hotelLat = hotel?.geo_coordinates?.latitude;
-    const hotelLng = hotel?.geo_coordinates?.longitude;
-    
-    let lastLat = hotelLat;
-    let lastLng = hotelLng;
-
-    itinerary.forEach((day: any) => {
-        (day.activities || []).forEach((act: any) => {
-            const actLat = act.geo_coordinates?.latitude;
-            const actLng = act.geo_coordinates?.longitude;
-            if (lastLat && lastLng && actLat && actLng) {
-                total += getHaversineDistance(Number(lastLat), Number(lastLng), Number(actLat), Number(actLng));
-            }
-            lastLat = actLat || lastLat;
-            lastLng = actLng || lastLng;
-        });
-        
-        if (lastLat && lastLng && hotelLat && hotelLng) {
-            total += getHaversineDistance(Number(lastLat), Number(lastLng), Number(hotelLat), Number(hotelLng));
-        }
-        lastLat = hotelLat;
-        lastLng = hotelLng;
-    });
-
-    if (total === 0) {
-        const days = parseInt(trip.duration) || 3;
-        total = days * 45;
-    }
-    return Math.round(total);
-};
-
-const calculateTripCost = (trip: any): number => {
-    const days = parseInt(trip.duration) || 1;
-    
-    // Average hotel cost (since user will choose one hotel recommendation)
-    const hotelCount = trip.hotels?.length || 0;
-    const totalHotelPrice = trip.hotels?.reduce((sum: number, hotel: any) => {
-        return sum + parsePrice(hotel.price_per_night);
-    }, 0) || 0;
-    
-    const avgHotelPrice = hotelCount > 0 ? (totalHotelPrice / hotelCount) : 0;
-    const hotelCost = avgHotelPrice * days;
-
-    const activitiesCost = trip.itinerary?.reduce((daySum: number, day: any) => {
-        return daySum + (day.activities?.reduce((actSum: number, act: any) => {
-            return actSum + parsePrice(act.ticket_pricing);
-        }, 0) || 0);
-    }, 0) || 0;
-
-    return Math.round(hotelCost + activitiesCost);
+  if (!destination) return "Unknown";
+  return destination.split(",")[0].trim();
 };
 
 const AnalyticsDashboard = () => {
-    const { userDetail } = useUserDetail();
-    const convex = useConvex();
-    const [trips, setTrips] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+  const { userDetail } = useUserDetail();
+  const convex = useConvex();
+  const [trips, setTrips] = useState<TripRecord[]>([]);
+  const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        if (userDetail) {
-            GetTrips();
-        }
-    }, [userDetail]);
+  const getTrips = useCallback(async () => {
+    if (!userDetail?._id) return;
+    try {
+      const result = await convex.query(api.tripDetail.getTripDetail, {
+        uid: userDetail._id as Id<"UserTable">,
+      });
+      setTrips((result || []) as TripRecord[]);
+    } catch (err) {
+      console.error("Failed to load user trips:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [convex, userDetail?._id]);
 
-    const GetTrips = async () => {
-        try {
-            const result = await convex.query(api.tripDetail.getTripDetail, { uid: userDetail._id });
-            setTrips(result || []);
-        } catch (err) {
-            console.error("Failed to load user trips:", err);
-        } finally {
-            setLoading(false);
-        }
-    };
+  useEffect(() => {
+    if (userDetail) {
+      void getTrips();
+    }
+  }, [userDetail, getTrips]);
 
     if (loading) {
         return (

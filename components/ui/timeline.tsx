@@ -1,4 +1,5 @@
 "use client";
+import type { TripInfo } from "@/types/trip";
 import { Calendar, Users, Wallet2 } from "lucide-react";
 import {
   motion,
@@ -12,7 +13,17 @@ interface TimelineEntry {
   content: React.ReactNode;
 }
 
-export const Timeline = ({ data, tripData, activeDay, setActiveDay }: { data: TimelineEntry[]; tripData: any, activeDay?: number | null, setActiveDay?: (day: number | null) => void }) => {
+export const Timeline = ({
+  data,
+  tripData,
+  activeDay,
+  setActiveDay,
+}: {
+  data: TimelineEntry[];
+  tripData: TripInfo | null;
+  activeDay?: number | null;
+  setActiveDay?: (day: number | null) => void;
+}) => {
   const ref = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState(0);
@@ -77,8 +88,12 @@ export const Timeline = ({ data, tripData, activeDay, setActiveDay }: { data: Ti
               }`}
             >
               <div className="sticky flex flex-col md:flex-row z-40 items-center top-40 self-start max-w-xs lg:max-w-sm md:w-[40%]">
-                <div 
+                <button
+                  type="button"
                   onClick={handleToggleDay}
+                  disabled={dayNumber === null}
+                  aria-label={dayNumber !== null ? `Toggle route focus for ${item.title}` : item.title}
+                  aria-pressed={isActive}
                   className={`h-10 absolute left-3 md:left-3 w-10 rounded-full flex items-center justify-center transition-all duration-300 ${
                     dayNumber !== null ? 'cursor-pointer hover:scale-110 active:scale-95' : ''
                   } ${isActive ? 'bg-primary/20 scale-110' : 'bg-white dark:bg-black'}`}
@@ -88,7 +103,7 @@ export const Timeline = ({ data, tripData, activeDay, setActiveDay }: { data: Ti
                       ? 'bg-primary border-primary' 
                       : 'bg-neutral-200 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-700'
                   }`} />
-                </div>
+                </button>
                 <h3 
                   onClick={handleToggleDay}
                   className={`hidden md:block text-xl md:pl-20 md:text-3xl font-bold transition-all duration-300 ${

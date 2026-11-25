@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   Calendar,
   Camera,
-  Check,
   Clock,
   Compass,
   Dices,
@@ -470,7 +469,7 @@ export default function HiddenGemsPage() {
         <div className="relative max-w-7xl mx-auto px-6 py-24 text-center">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
             <span className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-md px-4 py-2 rounded-full text-sm font-medium mb-6 border border-white/20">
-              <Compass className="w-4 h-4 text-emerald-300" /> Places 99% of travellers haven't found yet
+              <Compass className="w-4 h-4 text-emerald-300" aria-hidden="true" /> Places 99% of travellers haven&apos;t found yet
             </span>
             <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
               Discover
@@ -521,7 +520,7 @@ export default function HiddenGemsPage() {
       <div className="max-w-7xl mx-auto px-6 py-16">
         <div className="text-center mb-10">
           <motion.h2 initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-4xl font-bold text-gray-800 mb-4">
-            World's Best Kept Secrets
+            World&apos;s Best Kept Secrets
           </motion.h2>
           <p className="text-gray-600 text-lg max-w-xl mx-auto mb-8">
             These destinations are awe-inspiring — and still blissfully crowd-free.

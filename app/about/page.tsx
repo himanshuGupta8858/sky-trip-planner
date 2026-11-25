@@ -120,7 +120,7 @@ export default function AboutPage() {
               Travel planning used to take hours of research across dozens of tabs. SkyTrip replaces all of that with a single, intelligent conversation. Tell us where you want to go — we handle the rest.
             </p>
             <p className="text-gray-500 text-lg leading-relaxed">
-              Whether you're a solo backpacker on a budget or planning a luxury honeymoon, SkyTrip crafts a personalised itinerary that fits your style, timeline, and budget — powered by the latest AI.
+              Whether you&apos;re a solo backpacker on a budget or planning a luxury honeymoon, SkyTrip crafts a personalised itinerary that fits your style, timeline, and budget — powered by the latest AI.
             </p>
           </motion.div>
           <motion.div
@@ -224,7 +224,7 @@ export default function AboutPage() {
                 <Code2 className="w-5 h-5" /> Full-Stack Developer & AI Enthusiast
               </p>
               <p className="text-white/70 leading-relaxed mb-6 text-base">
-                Hi! I'm Himanshu — a passionate full-stack developer who loves building products at the intersection of AI and real-world utility. SkyTrip is my vision of making travel planning effortless and intelligent for everyone. I believe technology should remove friction, not add it.
+                Hi! I&apos;m Himanshu — a passionate full-stack developer who loves building products at the intersection of AI and real-world utility. SkyTrip is my vision of making travel planning effortless and intelligent for everyone. I believe technology should remove friction, not add it.
               </p>
 
               <div className="flex items-center gap-4 justify-center md:justify-start flex-wrap">

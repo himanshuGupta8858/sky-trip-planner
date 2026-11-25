@@ -3,7 +3,6 @@
 import { motion } from "motion/react"
 import { ArrowLeft, Flame, Heart, Mountain, Shield, Star, Wind, Zap } from "lucide-react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 
 const adventures = [
   {

@@ -80,7 +80,7 @@ const Hero = () => {
             transition={{ duration: 0.6, ease: "easeOut" }}
             className='text-5xl md:text-6xl font-bold text-gray-800 py-12'
           >
-            Hey, I'm your personal{' '}
+            Hey, I&apos;m your personal{' '}
             <span className='text-primary inline-block'>Trip Planner</span>
           </motion.h1>
           <motion.p
@@ -89,7 +89,7 @@ const Hero = () => {
             transition={{ duration: 0.6, delay: 0.2 }}
             className='text-lg md:text-xl text-gray-500 max-w-2xl mx-auto'
           >
-            Tell me what you want, and I'll handle the rest: flights, hotels, itineraries — all in seconds.
+            Tell me what you want, and I&apos;ll handle the rest: flights, hotels, itineraries — all in seconds.
           </motion.p>
         </div>
 
@@ -100,8 +100,10 @@ const Hero = () => {
           className='relative w-full max-w-3xl mx-auto'
         >
           <div className='relative flex items-center bg-white border-2 border-gray-200 rounded-2xl px-4 py-4 shadow-sm hover:border-gray-300 transition-colors'>
-            <Pencil className='w-5 h-5 text-gray-400 mr-3' />
+            <Pencil className='w-5 h-5 text-gray-400 mr-3' aria-hidden="true" />
+            <label htmlFor='hero-trip-prompt' className='sr-only'>Describe your trip destination and preferences</label>
             <input
+              id='hero-trip-prompt'
               type='text'
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}

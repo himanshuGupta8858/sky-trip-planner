@@ -1,11 +1,12 @@
 "use client"
 
-import React, { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
-import { MessageCircle, X, Send, Sparkles, Loader2, RefreshCw } from 'lucide-react';
+import type { TripInfo } from "@/types/trip";
+import axios from "axios";
+import { Loader2, MessageCircle, RefreshCw, Send, Sparkles, X } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
 
 interface TripChatbotProps {
-    tripContext: any;
+  tripContext: TripInfo;
 }
 
 interface ChatMessage {
@@ -169,7 +170,10 @@ const TripChatbot: React.FC<TripChatbotProps> = ({ tripContext }) => {
             {/* Floating Chat Button */}
             <div className="fixed bottom-44 right-10 sm:bottom-10 sm:right-28 z-50 no-print">
                 <button
+                    type="button"
                     onClick={() => setIsOpen(!isOpen)}
+                    aria-expanded={isOpen}
+                    aria-label={isOpen ? "Close Trip Assistant" : "Open Trip Assistant"}
                     className={`w-14 h-14 rounded-full flex items-center justify-center text-white shadow-xl cursor-pointer transition-all duration-300 transform active:scale-95 ${
                         isOpen 
                             ? 'bg-neutral-800 dark:bg-neutral-700 rotate-90' 
@@ -177,40 +181,47 @@ const TripChatbot: React.FC<TripChatbotProps> = ({ tripContext }) => {
                     }`}
                     title="Ask Trip Assistant"
                 >
-                    {isOpen ? <X className="w-6 h-6" /> : <MessageCircle className="w-7 h-7" />}
+                    {isOpen ? <X className="w-6 h-6" aria-hidden="true" /> : <MessageCircle className="w-7 h-7" aria-hidden="true" />}
                 </button>
             </div>
 
             {/* Chat Window Popup */}
             {isOpen && (
-                <div className="fixed inset-x-4 top-24 bottom-20 sm:inset-auto sm:bottom-28 sm:right-28 sm:w-96 sm:h-[500px] z-50 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-200">
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="trip-chatbot-title"
+                    className="fixed inset-x-4 top-24 bottom-20 sm:inset-auto sm:bottom-28 sm:right-28 sm:w-96 sm:h-[500px] z-50 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-200"
+                >
                     {/* Header */}
                     <div className="bg-neutral-50 dark:bg-neutral-800/60 border-b border-neutral-200 dark:border-neutral-800 px-4 py-3 flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" />
                             <div>
-                                <h3 className="font-bold text-xs sm:text-sm text-neutral-800 dark:text-neutral-100 flex items-center gap-1">
-                                    Trip Assistant <Sparkles className="w-3.5 h-3.5 text-primary fill-primary/20" />
+                                <h3 id="trip-chatbot-title" className="font-bold text-xs sm:text-sm text-neutral-800 dark:text-neutral-100 flex items-center gap-1">
+                                    Trip Assistant <Sparkles className="w-3.5 h-3.5 text-primary fill-primary/20" aria-hidden="true" />
                                 </h3>
                                 <p className="text-[10px] text-neutral-500 dark:text-neutral-400">Ask about your trip to {destination}</p>
                             </div>
                         </div>
                         <button 
+                            type="button"
                             onClick={resetChat} 
-                            className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors" 
+                            aria-label="Clear chat history"
+                            className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer" 
                             title="Clear Chat"
                         >
-                            <RefreshCw className="w-3.5 h-3.5" />
+                            <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
                         </button>
                     </div>
 
                     {/* Chat Area */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4" aria-live="polite">
                         {/* Greeting Message */}
                         <div className="flex justify-start">
                             <div className="max-w-[85%] bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 p-3 rounded-2xl rounded-tl-sm text-xs sm:text-sm">
                                 <p className="leading-relaxed">
-                                    Hi there! I'm your travel assistant. I have reviewed your itinerary for <strong>{destination}</strong>.
+                                    Hi there! I&apos;m your travel assistant. I have reviewed your itinerary for <strong>{destination}</strong>.
                                 </p>
                                 <p className="mt-1.5 leading-relaxed">
                                     Ask me about hotels, estimated costs, best times to visit specific spots, weather, or local recommendations!

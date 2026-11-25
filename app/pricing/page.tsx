@@ -3,21 +3,20 @@
 import Footer from '@/app/_components/footer';
 import { useUserDetail } from '@/app/provider';
 import { api } from '@/convex/_generated/api';
+import type { Id } from '@/convex/_generated/dataModel';
+import type { UserDetail } from '@/types/trip';
 import { useUser } from '@clerk/nextjs';
 import { useMutation } from 'convex/react';
 import { 
   ArrowRight, 
-  Award, 
   Check, 
   ChevronDown, 
-  CreditCard, 
   Globe, 
   HelpCircle, 
   Lock, 
   ShieldCheck, 
   Sparkles, 
   Star, 
-  Users, 
   Zap 
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -151,7 +150,7 @@ export default function PricingPage() {
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
-  const { isSignedIn, user } = useUser();
+  const { isSignedIn } = useUser();
   const { userDetail, setUserDetail } = useUserDetail();
   const upgradeSubscription = useMutation(api.user.UpgradeSubscription);
   const router = useRouter();
@@ -180,13 +179,13 @@ export default function PricingPage() {
       setLoadingPlan(plan.id);
       const creditsToAssign = plan.id === "pro" ? 999 : 9999;
       const updatedUser = await upgradeSubscription({
-        uid: userDetail._id,
+        uid: userDetail._id as Id<"UserTable">,
         plan: plan.id,
         aiCredits: creditsToAssign
       });
 
       if (updatedUser) {
-        setUserDetail(updatedUser);
+        setUserDetail(updatedUser as UserDetail);
       }
 
       toast.success(
@@ -247,6 +246,8 @@ export default function PricingPage() {
               </span>
               <button
                 type="button"
+                role="switch"
+                aria-checked={isAnnual}
                 onClick={() => setIsAnnual(!isAnnual)}
                 className="w-14 h-8 bg-white/20 hover:bg-white/30 backdrop-blur-md rounded-full p-1 relative transition-colors border border-white/30 focus:outline-none focus:ring-2 focus:ring-teal-400"
                 aria-label="Toggle Annual or Monthly Billing"
@@ -336,7 +337,7 @@ export default function PricingPage() {
                   {/* Feature Checklist */}
                   <div className="space-y-3.5 mb-8">
                     <p className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      What's Included:
+                      What&apos;s Included:
                     </p>
                     {plan.features.map((feature, fIndex) => (
                       <div key={fIndex} className="flex items-start gap-3">
@@ -472,8 +473,9 @@ export default function PricingPage() {
               >
                 <button
                   type="button"
+                  aria-expanded={openFaq === i}
                   onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  className="w-full p-5 text-left font-bold text-slate-800 dark:text-slate-100 flex justify-between items-center gap-4 hover:text-teal-600 dark:hover:text-teal-400 transition-colors"
+                  className="w-full p-5 text-left font-bold text-slate-800 dark:text-slate-100 flex justify-between items-center gap-4 hover:text-teal-600 dark:hover:text-teal-400 transition-colors cursor-pointer"
                 >
                   <span>{faq.q}</span>
                   <ChevronDown

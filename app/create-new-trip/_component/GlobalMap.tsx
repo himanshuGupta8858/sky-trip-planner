@@ -1,420 +1,482 @@
 "use client";
-import { GoogleMap, Marker, Polyline, useJsApiLoader, InfoWindow } from '@react-google-maps/api';
-import { useCallback, useEffect, useState } from 'react';
-import { Utensils, DollarSign, Heart, Train, Zap, Fuel, ShoppingBag, Droplet } from 'lucide-react';
+import type { Activity, Hotel, ItineraryDay, NearbyPlace, TripInfo } from "@/types/trip";
+import { GoogleMap, InfoWindow, Marker, Polyline, useJsApiLoader } from "@react-google-maps/api";
+import { DollarSign, Droplet, Fuel, Heart, ShoppingBag, Train, Utensils, Zap } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
 const containerStyle = {
-    width: '100%',
-    height: '100%',
-    minHeight: '450px',
-    borderRadius: '16px'
+  width: "100%",
+  height: "100%",
+  minHeight: "450px",
+  borderRadius: "16px",
 };
 
-const LIBRARIES: any = ["places"];
+const LIBRARIES: Array<"places"> = ["places"];
 
 const CATEGORIES = [
-    { id: 'restaurant', name: 'Restaurants', icon: Utensils, type: 'restaurant' },
-    { id: 'atm', name: 'ATMs', icon: DollarSign, type: 'atm' },
-    { id: 'hospital', name: 'Hospitals', icon: Heart, type: 'hospital' },
-    { id: 'metro', name: 'Metro', icon: Train, type: 'subway_station' },
-    { id: 'charging', name: 'EV Charging', icon: Zap, keyword: 'electric_vehicle_charging_station' },
-    { id: 'fuel', name: 'Fuel', icon: Fuel, type: 'gas_station' },
-    { id: 'shopping', name: 'Shopping', icon: ShoppingBag, type: 'shopping_mall' },
-    { id: 'washroom', name: 'Washrooms', icon: Droplet, keyword: 'public restroom' }
+  { id: "restaurant", name: "Restaurants", icon: Utensils, type: "restaurant" },
+  { id: "atm", name: "ATMs", icon: DollarSign, type: "atm" },
+  { id: "hospital", name: "Hospitals", icon: Heart, type: "hospital" },
+  { id: "metro", name: "Metro", icon: Train, type: "subway_station" },
+  { id: "charging", name: "EV Charging", icon: Zap, keyword: "electric_vehicle_charging_station" },
+  { id: "fuel", name: "Fuel", icon: Fuel, type: "gas_station" },
+  { id: "shopping", name: "Shopping", icon: ShoppingBag, type: "shopping_mall" },
+  { id: "washroom", name: "Washrooms", icon: Droplet, keyword: "public restroom" },
 ];
 
-const GlobalMap = ({ trip, activeDay }: { trip: any, activeDay: number | null }) => {
-    const { isLoaded } = useJsApiLoader({
-        id: 'google-map-script',
-        googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY || "",
-        libraries: LIBRARIES
-    });
+interface GooglePlaceNewResult {
+  displayName?: string | { text?: string };
+  location?: { lat: (() => number) | number; lng: (() => number) | number };
+  rating?: number;
+  formattedAddress?: string;
+}
 
-    const [map, setMap] = useState<any | null>(null);
-    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-    const [nearbyPlaces, setNearbyPlaces] = useState<any[]>([]);
-    const [selectedNearbyPlace, setSelectedNearbyPlace] = useState<any | null>(null);
-    const [isSearching, setIsSearching] = useState(false);
+interface GoogleMapsGlobal {
+  maps: {
+    LatLngBounds: new () => {
+      extend: (coords: { lat: number; lng: number }) => void;
+    };
+    LatLng: new (lat: number, lng: number) => unknown;
+    event: {
+      addListener: (instance: unknown, eventName: string, handler: () => void) => unknown;
+      removeListener: (listener: unknown) => void;
+    };
+    SymbolPath?: {
+      FORWARD_CLOSED_ARROW: number;
+    };
+    places?: {
+      Place?: {
+        searchNearby?: (req: Record<string, unknown>) => Promise<{ places?: GooglePlaceNewResult[] }>;
+      };
+      PlacesService?: new (map: google.maps.Map) => {
+        nearbySearch: (
+          req: Record<string, unknown>,
+          callback: (results: NearbyPlace[] | null, status: string) => void
+        ) => void;
+      };
+      PlacesServiceStatus?: {
+        OK: string;
+      };
+    };
+  };
+}
 
-    const onLoad = useCallback(function callback(map: any) {
-        setMap(map);
-    }, []);
+const GlobalMap = ({ trip, activeDay }: { trip: TripInfo | null; activeDay: number | null }) => {
+  const { isLoaded } = useJsApiLoader({
+    id: "google-map-script",
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY || "",
+    libraries: LIBRARIES,
+  });
 
-    const onUnmount = useCallback(function callback(map: any) {
-        setMap(null);
-    }, []);
+  const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([]);
+  const [selectedNearbyPlace, setSelectedNearbyPlace] = useState<NearbyPlace | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
 
-    // Set map bounds dynamically based on activeDay
-    useEffect(() => {
-        if (!map || !(window as any).google || !trip) return;
-        const google = (window as any).google;
-        const bounds = new google.maps.LatLngBounds();
+  const onLoad = useCallback((loadedMap: google.maps.Map) => {
+    setMap(loadedMap);
+  }, []);
+
+  const onUnmount = useCallback(() => {
+    setMap(null);
+  }, []);
+
+  const getGoogle = (): GoogleMapsGlobal | undefined => {
+    if (typeof window === "undefined") return undefined;
+    return (window as unknown as { google?: GoogleMapsGlobal }).google;
+  };
+
+  useEffect(() => {
+    const google = getGoogle();
+    if (!map || !google || !trip) return;
+    const bounds = new google.maps.LatLngBounds();
+
+    if (activeDay) {
+      const dayData = trip.itinerary?.find((item: ItineraryDay) => item.day === activeDay);
+      let hasPoints = false;
+
+      const hotel = trip.hotels?.[0];
+      if (hotel?.geo_coordinates?.latitude && hotel?.geo_coordinates?.longitude) {
+        bounds.extend({
+          lat: Number(hotel.geo_coordinates.latitude),
+          lng: Number(hotel.geo_coordinates.longitude),
+        });
+        hasPoints = true;
+      }
+
+      dayData?.activities?.forEach((activity: Activity) => {
+        if (activity?.geo_coordinates?.latitude && activity?.geo_coordinates?.longitude) {
+          bounds.extend({
+            lat: Number(activity.geo_coordinates.latitude),
+            lng: Number(activity.geo_coordinates.longitude),
+          });
+          hasPoints = true;
+        }
+      });
+
+      if (hasPoints) {
+        map.fitBounds(bounds as unknown as google.maps.LatLngBounds);
+        const listener = google.maps.event.addListener(map, "bounds_changed", () => {
+          const currentZoom = map.getZoom();
+          if (currentZoom && currentZoom > 15) map.setZoom(15);
+          google.maps.event.removeListener(listener);
+        });
+      }
+    } else {
+      let hasPoints = false;
+      trip?.hotels?.forEach((hotel: Hotel) => {
+        if (hotel?.geo_coordinates?.latitude && hotel?.geo_coordinates?.longitude) {
+          bounds.extend({
+            lat: Number(hotel.geo_coordinates.latitude),
+            lng: Number(hotel.geo_coordinates.longitude),
+          });
+          hasPoints = true;
+        }
+      });
+
+      trip?.itinerary?.forEach((item: ItineraryDay) => {
+        item.activities?.forEach((activity: Activity) => {
+          if (activity?.geo_coordinates?.latitude && activity?.geo_coordinates?.longitude) {
+            bounds.extend({
+              lat: Number(activity.geo_coordinates.latitude),
+              lng: Number(activity.geo_coordinates.longitude),
+            });
+            hasPoints = true;
+          }
+        });
+      });
+
+      if (hasPoints) {
+        map.fitBounds(bounds as unknown as google.maps.LatLngBounds);
+      }
+    }
+  }, [activeDay, map, trip]);
+
+  const searchNearby = useCallback(
+    (categoryId: string) => {
+      const google = getGoogle();
+      if (!map || !google || !trip) return;
+
+      const category = CATEGORIES.find((c) => c.id === categoryId);
+      if (!category) return;
+
+      setIsSearching(true);
+      setSelectedNearbyPlace(null);
+
+      try {
+        let lat: number | null = null;
+        let lng: number | null = null;
 
         if (activeDay) {
-            const dayData = trip.itinerary?.find((item: any) => item.day === activeDay);
-            let hasPoints = false;
-
-            // Include first hotel in bounds
-            const hotel = trip.hotels?.[0];
-            if (hotel?.geo_coordinates?.latitude && hotel?.geo_coordinates?.longitude) {
-                bounds.extend({
-                    lat: hotel.geo_coordinates.latitude,
-                    lng: hotel.geo_coordinates.longitude
-                });
-                hasPoints = true;
-            }
-
-            // Include current day's activities in bounds
-            dayData?.activities?.forEach((activity: any) => {
-                if (activity?.geo_coordinates?.latitude && activity?.geo_coordinates?.longitude) {
-                    bounds.extend({
-                        lat: activity.geo_coordinates.latitude,
-                        lng: activity.geo_coordinates.longitude
-                    });
-                    hasPoints = true;
-                }
-            });
-
-            if (hasPoints) {
-                map.fitBounds(bounds);
-                // Set custom zoom offset to prevent maps from getting too close
-                const listener = google.maps.event.addListener(map, 'bounds_changed', () => {
-                    if (map.getZoom() > 15) map.setZoom(15);
-                    google.maps.event.removeListener(listener);
-                });
-            }
-        } else {
-            // Overview Mode: include all hotels and activities
-            let hasPoints = false;
-            trip?.hotels?.forEach((hotel: any) => {
-                if (hotel?.geo_coordinates?.latitude && hotel?.geo_coordinates?.longitude) {
-                    bounds.extend({
-                        lat: hotel.geo_coordinates.latitude,
-                        lng: hotel.geo_coordinates.longitude
-                    });
-                    hasPoints = true;
-                }
-            });
-
-            trip?.itinerary?.forEach((item: any) => {
-                item.activities?.forEach((activity: any) => {
-                    if (activity?.geo_coordinates?.latitude && activity?.geo_coordinates?.longitude) {
-                        bounds.extend({
-                            lat: activity.geo_coordinates.latitude,
-                            lng: activity.geo_coordinates.longitude
-                        });
-                        hasPoints = true;
-                    }
-                });
-            });
-
-            if (hasPoints) {
-                map.fitBounds(bounds);
-            }
+          const dayData = trip.itinerary?.find((item: ItineraryDay) => item.day === activeDay);
+          const firstActivity = dayData?.activities?.[0];
+          if (firstActivity?.geo_coordinates?.latitude) {
+            lat = Number(firstActivity.geo_coordinates.latitude);
+            lng = Number(firstActivity.geo_coordinates.longitude);
+          }
         }
-    }, [activeDay, map, trip]);
 
-    // Handle searching for nearby places
-    const searchNearby = useCallback((categoryId: string) => {
-        if (!map || !(window as any).google || !trip) return;
-
-        const category = CATEGORIES.find(c => c.id === categoryId);
-        if (!category) return;
-
-        setIsSearching(true);
-        setSelectedNearbyPlace(null);
-
-        try {
-            const google = (window as any).google;
-            // 1. Try modern Places API (New) if available on client
-            if (google?.maps?.places?.Place && typeof google.maps.places.Place.searchNearby === 'function') {
-                const newSearchReq: any = {
-                    fields: ['displayName', 'location', 'rating', 'formattedAddress'],
-                    locationRestriction: {
-                        center: { lat, lng },
-                        radius: 2000,
-                    },
-                    maxResultCount: 15,
-                };
-                if (category.type) {
-                    newSearchReq.includedPrimaryTypes = [category.type];
-                }
-
-                google.maps.places.Place.searchNearby(newSearchReq)
-                    .then(({ places }: any) => {
-                        setIsSearching(false);
-                        if (places && places.length > 0) {
-                            const formatted = places.map((p: any) => ({
-                                name: typeof p.displayName === 'string' ? p.displayName : p.displayName?.text || 'Nearby Place',
-                                geometry: { location: p.location },
-                                rating: p.rating,
-                                vicinity: p.formattedAddress
-                            }));
-                            setNearbyPlaces(formatted);
-                        } else {
-                            setNearbyPlaces([]);
-                        }
-                    })
-                    .catch((err: any) => {
-                        console.warn("Places API (New) nearby search notice:", err?.message || err);
-                        setIsSearching(false);
-                        setNearbyPlaces([]);
-                    });
-                return;
-            }
-
-            // 2. Fallback to classic PlacesService if available
-            if (!google?.maps?.places?.PlacesService) {
-                setIsSearching(false);
-                return;
-            }
-
-            const service = new google.maps.places.PlacesService(map);
-            const searchLocation = new google.maps.LatLng(lat, lng);
-            const searchRequest: any = {
-                location: searchLocation,
-                radius: 2000 // 2 km radius
-            };
-
-            if (category.type) {
-                searchRequest.type = category.type;
-            } else if (category.keyword) {
-                searchRequest.keyword = category.keyword;
-            }
-
-            service.nearbySearch(searchRequest, (results: any, status: any) => {
-                setIsSearching(false);
-                if (status === google.maps.places.PlacesServiceStatus?.OK && results) {
-                    setNearbyPlaces(results);
-                } else {
-                    setNearbyPlaces([]);
-                }
-            });
-        } catch (err) {
-            console.warn("Places nearby search warning:", err);
-            setIsSearching(false);
+        if (!lat || !lng) {
+          const hotel = trip.hotels?.[0];
+          if (hotel?.geo_coordinates?.latitude) {
+            lat = Number(hotel.geo_coordinates.latitude);
+            lng = Number(hotel.geo_coordinates.longitude);
+          }
         }
-    }, [map, trip, activeDay]);
 
-    // Trigger nearby search whenever day or active category shifts
-    useEffect(() => {
-        if (selectedCategory) {
-            searchNearby(selectedCategory);
-        } else {
+        if (!lat || !lng) {
+          setIsSearching(false);
+          return;
+        }
+
+        if (google.maps.places?.Place?.searchNearby) {
+          const newSearchReq: Record<string, unknown> = {
+            fields: ["displayName", "location", "rating", "formattedAddress"],
+            locationRestriction: {
+              center: { lat, lng },
+              radius: 2000,
+            },
+            maxResultCount: 15,
+          };
+          if (category.type) {
+            newSearchReq.includedPrimaryTypes = [category.type];
+          }
+
+          google.maps.places.Place.searchNearby(newSearchReq)
+            .then(({ places }) => {
+              setIsSearching(false);
+              if (places && places.length > 0) {
+                const formatted: NearbyPlace[] = places.map((p) => ({
+                  name:
+                    typeof p.displayName === "string"
+                      ? p.displayName
+                      : p.displayName?.text || "Nearby Place",
+                  geometry: { location: p.location },
+                  rating: p.rating,
+                  vicinity: p.formattedAddress,
+                }));
+                setNearbyPlaces(formatted);
+              } else {
+                setNearbyPlaces([]);
+              }
+            })
+            .catch(() => {
+              setIsSearching(false);
+              setNearbyPlaces([]);
+            });
+          return;
+        }
+
+        if (!google.maps.places?.PlacesService) {
+          setIsSearching(false);
+          return;
+        }
+
+        const service = new google.maps.places.PlacesService(map);
+        const searchLocation = new google.maps.LatLng(lat, lng);
+        const searchRequest: Record<string, unknown> = {
+          location: searchLocation,
+          radius: 2000,
+        };
+
+        if (category.type) {
+          searchRequest.type = category.type;
+        } else if (category.keyword) {
+          searchRequest.keyword = category.keyword;
+        }
+
+        service.nearbySearch(searchRequest, (results, status) => {
+          setIsSearching(false);
+          if (status === google.maps.places?.PlacesServiceStatus?.OK && results) {
+            setNearbyPlaces(results);
+          } else {
             setNearbyPlaces([]);
-            setSelectedNearbyPlace(null);
-        }
-    }, [activeDay, trip, selectedCategory, searchNearby]);
-
-    const handleCategoryClick = (categoryId: string) => {
-        if (selectedCategory === categoryId) {
-            setSelectedCategory(null);
-        } else {
-            setSelectedCategory(categoryId);
-        }
-    };
-
-    // Calculate Polyline route path coordinates
-    const getRouteCoordinates = () => {
-        if (!trip || !activeDay) return [];
-        
-        const dayData = trip.itinerary?.find((item: any) => item.day === activeDay);
-        if (!dayData || !dayData.activities) return [];
-
-        const coords: { lat: number; lng: number }[] = [];
-
-        // Start at hotel
-        const hotel = trip.hotels?.[0];
-        if (hotel?.geo_coordinates?.latitude && hotel?.geo_coordinates?.longitude) {
-            coords.push({
-                lat: hotel.geo_coordinates.latitude,
-                lng: hotel.geo_coordinates.longitude
-            });
-        }
-
-        // Add activities in order
-        dayData.activities.forEach((activity: any) => {
-            if (activity?.geo_coordinates?.latitude && activity?.geo_coordinates?.longitude) {
-                coords.push({
-                    lat: activity.geo_coordinates.latitude,
-                    lng: activity.geo_coordinates.longitude
-                });
-            }
+          }
         });
+      } catch (err) {
+        console.warn("Places nearby search warning:", err);
+        setIsSearching(false);
+      }
+    },
+    [map, trip, activeDay]
+  );
 
-        // Loop back to hotel
-        if (coords.length > 1 && hotel?.geo_coordinates?.latitude && hotel?.geo_coordinates?.longitude) {
-            coords.push({
-                lat: hotel.geo_coordinates.latitude,
-                lng: hotel.geo_coordinates.longitude
-            });
-        }
+  useEffect(() => {
+    if (selectedCategory) {
+      searchNearby(selectedCategory);
+    } else {
+      setNearbyPlaces([]);
+      setSelectedNearbyPlace(null);
+    }
+  }, [selectedCategory, searchNearby]);
 
-        return coords;
-    };
+  const handleCategoryClick = (categoryId: string) => {
+    setSelectedCategory((prev) => (prev === categoryId ? null : categoryId));
+  };
 
-    if (!isLoaded) return <div className="p-10 text-center text-neutral-500">Loading Map...</div>;
-    if (!trip) return null;
+  const getRouteCoordinates = () => {
+    if (!activeDay || !trip) return [];
+    const dayData = trip.itinerary?.find((item: ItineraryDay) => item.day === activeDay);
+    if (!dayData || !dayData.activities) return [];
 
-    return (
-        <div className="flex flex-col h-full w-full">
-            {/* Category Selectors Bar */}
-            <div className="flex gap-2 overflow-x-auto pb-3 mb-1 no-print scrollbar-thin scrollbar-thumb-neutral-200 dark:scrollbar-thumb-neutral-800">
-                {CATEGORIES.map((category) => {
-                    const IconComponent = category.icon;
-                    const isSelected = selectedCategory === category.id;
-                    return (
-                        <button
-                            key={category.id}
-                            onClick={() => handleCategoryClick(category.id)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer ${
-                                isSelected
-                                    ? 'bg-primary border-primary text-white shadow-sm hover:bg-opacity-95'
-                                    : 'bg-neutral-50 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800'
-                            }`}
-                        >
-                            <IconComponent className="w-3.5 h-3.5" />
-                            <span>{category.name}</span>
-                            {isSelected && isSearching && (
-                                <span className="w-2 h-2 rounded-full border border-white border-t-transparent animate-spin ml-0.5" />
-                            )}
-                        </button>
-                    );
-                })}
-            </div>
+    const coords: { lat: number; lng: number }[] = [];
 
-            <div className="relative rounded-2xl overflow-hidden border border-neutral-200 dark:border-neutral-800 shadow-md h-[450px] w-full">
-                <GoogleMap
-                    mapContainerStyle={containerStyle}
-                    onLoad={onLoad}
-                    onUnmount={onUnmount}
-                    options={{
-                        mapId: "DEMO_MAP_ID",
-                        gestureHandling: "cooperative"
-                    }}
-                >
-                    {/* Hotel Markers */}
-                    {trip?.hotels?.map((hotel: any, index: number) => {
-                        if (activeDay && index > 0) return null; // Show only primary hotel in day view
-                        return hotel?.geo_coordinates && (
-                            <Marker
-                                key={`hotel-${index}`}
-                                position={{
-                                    lat: hotel.geo_coordinates.latitude,
-                                    lng: hotel.geo_coordinates.longitude
-                                }}
-                                label={{
-                                    text: "🏨",
-                                    fontSize: "14px"
-                                }}
-                                title={hotel.hotel_name}
-                            />
-                        );
-                    })}
+    const hotel = trip.hotels?.[0];
+    if (hotel?.geo_coordinates?.latitude && hotel?.geo_coordinates?.longitude) {
+      coords.push({
+        lat: Number(hotel.geo_coordinates.latitude),
+        lng: Number(hotel.geo_coordinates.longitude),
+      });
+    }
 
-                    {/* Activity Markers */}
-                    {trip?.itinerary?.map((item: any) => {
-                        if (activeDay && item.day !== activeDay) return null; // Hide other days' activities
-                        return item.activities?.map((activity: any, index: number) => (
-                            activity?.geo_coordinates && (
-                                <Marker
-                                    key={`activity-${item.day}-${index}`}
-                                    position={{
-                                        lat: activity.geo_coordinates.latitude,
-                                        lng: activity.geo_coordinates.longitude
-                                    }}
-                                    label={{
-                                        text: `${index + 1}`,
-                                        color: "white",
-                                        fontWeight: "bold"
-                                    }}
-                                    title={activity.place_name}
-                                />
-                            )
-                        ));
-                    })}
+    dayData.activities.forEach((activity: Activity) => {
+      if (activity?.geo_coordinates?.latitude && activity?.geo_coordinates?.longitude) {
+        coords.push({
+          lat: Number(activity.geo_coordinates.latitude),
+          lng: Number(activity.geo_coordinates.longitude),
+        });
+      }
+    });
 
-                    {/* Polyline Route */}
-                    {activeDay && (
-                        <Polyline
-                            path={getRouteCoordinates()}
-                            options={{
-                                strokeColor: "#E11D48", // Theme Rose-600 / primary highlight
-                                strokeOpacity: 0.9,
-                                strokeWeight: 4,
-                                geodesic: true,
-                                icons: typeof window !== 'undefined' && (window as any).google?.maps?.SymbolPath ? [{
-                                    icon: {
-                                        path: (window as any).google?.maps?.SymbolPath?.FORWARD_CLOSED_ARROW
-                                    },
-                                    offset: '100px',
-                                    repeat: '100px'
-                                }] : undefined
-                            }}
-                        />
-                    )}
+    if (coords.length > 1 && hotel?.geo_coordinates?.latitude && hotel?.geo_coordinates?.longitude) {
+      coords.push({
+        lat: Number(hotel.geo_coordinates.latitude),
+        lng: Number(hotel.geo_coordinates.longitude),
+      });
+    }
 
-                    {/* Nearby Places Markers */}
-                    {selectedCategory && nearbyPlaces.map((place: any) => {
-                        const placeLat = place.geometry?.location?.lat;
-                        const placeLng = place.geometry?.location?.lng;
-                        
-                        // Check if lat/lng are functions or numbers
-                        const lat = typeof placeLat === 'function' ? placeLat() : placeLat;
-                        const lng = typeof placeLng === 'function' ? placeLng() : placeLng;
+    return coords;
+  };
 
-                        if (!lat || !lng) return null;
+  if (!isLoaded) return <div className="p-10 text-center text-neutral-500">Loading Map...</div>;
+  if (!trip) return null;
 
-                        return (
-                            <Marker
-                                key={`nearby-${place.place_id}`}
-                                position={{ lat, lng }}
-                                title={place.name}
-                                icon={{
-                                    url: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png"
-                                }}
-                                onClick={() => setSelectedNearbyPlace(place)}
-                            />
-                        );
-                    })}
+  const googleGlobal = getGoogle();
 
-                    {/* InfoWindow for Selected Nearby Place */}
-                    {selectedNearbyPlace && (() => {
-                        const placeLat = selectedNearbyPlace.geometry?.location?.lat;
-                        const placeLng = selectedNearbyPlace.geometry?.location?.lng;
-                        const lat = typeof placeLat === 'function' ? placeLat() : placeLat;
-                        const lng = typeof placeLng === 'function' ? placeLng() : placeLng;
+  return (
+    <div className="flex flex-col h-full w-full">
+      <div
+        className="flex gap-2 overflow-x-auto pb-3 mb-1 no-print scrollbar-thin scrollbar-thumb-neutral-200 dark:scrollbar-thumb-neutral-800"
+        role="group"
+        aria-label="Filter nearby places"
+      >
+        {CATEGORIES.map((category) => {
+          const IconComponent = category.icon;
+          const isSelected = selectedCategory === category.id;
+          return (
+            <button
+              key={category.id}
+              type="button"
+              aria-pressed={isSelected}
+              onClick={() => handleCategoryClick(category.id)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold whitespace-nowrap transition-all duration-200 cursor-pointer ${
+                isSelected
+                  ? "bg-primary border-primary text-white shadow-sm hover:bg-opacity-95"
+                  : "bg-neutral-50 dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              }`}
+            >
+              <IconComponent className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>{category.name}</span>
+              {isSelected && isSearching && (
+                <span className="w-2 h-2 rounded-full border border-white border-t-transparent animate-spin ml-0.5" aria-hidden="true" />
+              )}
+            </button>
+          );
+        })}
+      </div>
 
-                        return lat && lng && (
-                            <InfoWindow
-                                position={{ lat, lng }}
-                                onCloseClick={() => setSelectedNearbyPlace(null)}
-                            >
-                                <div className="p-2 text-neutral-900 font-sans max-w-[200px]">
-                                    <h4 className="font-bold text-xs mb-1 leading-tight">{selectedNearbyPlace.name}</h4>
-                                    <p className="text-[10px] text-neutral-600 mb-1 leading-normal">{selectedNearbyPlace.vicinity}</p>
-                                    {selectedNearbyPlace.rating && (
-                                        <div className="flex items-center gap-1 text-[10px] mb-1.5">
-                                            <span className="text-yellow-600 font-bold">★ {selectedNearbyPlace.rating}</span>
-                                            <span className="text-neutral-400">({selectedNearbyPlace.user_ratings_total})</span>
-                                        </div>
-                                    )}
-                                    <a
-                                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedNearbyPlace.name + " " + selectedNearbyPlace.vicinity)}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-[10px] font-bold text-red-500 hover:underline inline-flex items-center gap-0.5 mt-1 cursor-pointer"
-                                    >
-                                        View Directions ➔
-                                    </a>
-                                </div>
-                            </InfoWindow>
-                        );
-                    })()}
-                </GoogleMap>
-            </div>
-        </div>
-    );
-}
+      <div className="relative rounded-2xl overflow-hidden border border-neutral-200 dark:border-neutral-800 shadow-md h-[450px] w-full">
+        <GoogleMap
+          mapContainerStyle={containerStyle}
+          onLoad={onLoad}
+          onUnmount={onUnmount}
+          options={{
+            mapId: "DEMO_MAP_ID",
+            gestureHandling: "cooperative",
+          }}
+        >
+          {trip?.hotels?.map((hotel: Hotel, index: number) => {
+            if (activeDay && index > 0) return null;
+            return (
+              hotel?.geo_coordinates && (
+                <Marker
+                  key={`hotel-${index}`}
+                  position={{
+                    lat: Number(hotel.geo_coordinates.latitude),
+                    lng: Number(hotel.geo_coordinates.longitude),
+                  }}
+                  label={{
+                    text: "🏨",
+                    fontSize: "14px",
+                  }}
+                  title={hotel.hotel_name}
+                />
+              )
+            );
+          })}
+
+          {trip?.itinerary?.map((item: ItineraryDay) => {
+            if (activeDay && item.day !== activeDay) return null;
+            return item.activities?.map((activity: Activity, index: number) =>
+              activity?.geo_coordinates ? (
+                <Marker
+                  key={`activity-${item.day}-${index}`}
+                  position={{
+                    lat: Number(activity.geo_coordinates.latitude),
+                    lng: Number(activity.geo_coordinates.longitude),
+                  }}
+                  label={{
+                    text: `${index + 1}`,
+                    color: "white",
+                    fontWeight: "bold",
+                  }}
+                  title={activity.place_name}
+                />
+              ) : null
+            );
+          })}
+
+          {activeDay && (
+            <Polyline
+              path={getRouteCoordinates()}
+              options={{
+                strokeColor: "#E11D48",
+                strokeOpacity: 0.9,
+                strokeWeight: 4,
+                geodesic: true,
+                icons: googleGlobal?.maps?.SymbolPath
+                  ? [
+                      {
+                        icon: {
+                          path: googleGlobal.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                        },
+                        offset: "100px",
+                        repeat: "100px",
+                      },
+                    ]
+                  : undefined,
+              }}
+            />
+          )}
+
+          {selectedCategory &&
+            nearbyPlaces.map((place, index) => {
+              const placeLat = place.geometry?.location?.lat;
+              const placeLng = place.geometry?.location?.lng;
+              const lat = typeof placeLat === "function" ? placeLat() : placeLat;
+              const lng = typeof placeLng === "function" ? placeLng() : placeLng;
+
+              if (!lat || !lng) return null;
+
+              return (
+                <Marker
+                  key={`nearby-${place.name || index}-${lat}`}
+                  position={{ lat, lng }}
+                  title={place.name}
+                  icon={{
+                    url: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
+                  }}
+                  onClick={() => setSelectedNearbyPlace(place)}
+                />
+              );
+            })}
+
+          {selectedNearbyPlace &&
+            (() => {
+              const placeLat = selectedNearbyPlace.geometry?.location?.lat;
+              const placeLng = selectedNearbyPlace.geometry?.location?.lng;
+              const lat = typeof placeLat === "function" ? placeLat() : placeLat;
+              const lng = typeof placeLng === "function" ? placeLng() : placeLng;
+
+              return (
+                lat &&
+                lng && (
+                  <InfoWindow
+                    position={{ lat, lng }}
+                    onCloseClick={() => setSelectedNearbyPlace(null)}
+                  >
+                    <div className="p-2 text-neutral-900 font-sans max-w-[200px]">
+                      <h4 className="font-bold text-sm mb-1">{selectedNearbyPlace.name}</h4>
+                      {selectedNearbyPlace.vicinity && (
+                        <p className="text-xs text-neutral-600 mb-1">
+                          {selectedNearbyPlace.vicinity}
+                        </p>
+                      )}
+                      {selectedNearbyPlace.rating && (
+                        <p className="text-xs font-semibold text-amber-600">
+                          ★ {selectedNearbyPlace.rating}
+                        </p>
+                      )}
+                    </div>
+                  </InfoWindow>
+                )
+              );
+            })()}
+        </GoogleMap>
+      </div>
+    </div>
+  );
+};
 
 export default GlobalMap;

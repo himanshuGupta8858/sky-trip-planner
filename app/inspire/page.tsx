@@ -375,7 +375,7 @@ export default function InspirePage() {
       <div className="max-w-7xl mx-auto px-6 py-16">
         {/* Mood Filter */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <h2 className="text-2xl font-bold text-gray-800 mb-6">What's your travel mood?</h2>
+          <h2 className="text-2xl font-bold text-gray-800 mb-6">What&apos;s your travel mood?</h2>
           <div className="flex flex-wrap gap-3 mb-16">
             {moods.map((mood, i) => (
               <motion.button
